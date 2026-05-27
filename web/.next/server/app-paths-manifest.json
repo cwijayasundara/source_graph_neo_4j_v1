@@ -1,5 +1,0 @@
-{
-  "/page": "app/page.js",
-  "/repo/[...slug]/page": "app/repo/[...slug]/page.js",
-  "/_not-found/page": "app/_not-found/page.js"
-}
