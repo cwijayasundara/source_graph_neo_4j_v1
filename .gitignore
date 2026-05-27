@@ -10,3 +10,4 @@ build/
 .DS_Store
 node_modules/
 .next/
+source_code_to_analyse/cwijayasundara/neo_4j_context_graphs_v1.0/
