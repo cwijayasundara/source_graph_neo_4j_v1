@@ -1,0 +1,65 @@
+# MCP Server — Financial Services Context Graph
+
+This project includes an MCP (Model Context Protocol) server that lets Claude Desktop
+query the same knowledge graph your web application uses.
+
+## Setup
+
+### 1. Install backend dependencies
+
+```bash
+cd .. && make install-backend
+```
+
+### 2. Copy the MCP config into Claude Desktop
+
+Merge `claude_desktop_config.json` into your Claude Desktop configuration:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+Before copying, replace the environment variable placeholders with your actual values
+from `.env`, or ensure the environment variables are set in your shell.
+
+### 3. Restart Claude Desktop
+
+After updating the config, restart Claude Desktop. You should see
+**financegraph-memory** in the MCP server list.
+
+## Available Tools
+
+This project uses the **extended** profile (16 tools):
+
+**Core:**
+- `memory_search` — Search across all memory types
+- `memory_get_context` — Get combined context for a session
+- `memory_store_message` — Store conversation messages
+- `memory_add_entity` — Add entities to the knowledge graph
+- `memory_add_preference` — Store user preferences
+- `memory_add_fact` — Add subject-predicate-object facts
+
+**Extended:**
+- `memory_get_conversation` — Get conversation history
+- `memory_list_sessions` — List conversation sessions
+- `memory_get_entity` — Get entity details
+- `memory_export_graph` — Export the memory graph
+- `memory_create_relationship` — Create entity relationships
+- `memory_start_trace` — Start a reasoning trace
+- `memory_record_step` — Record a trace step
+- `memory_complete_trace` — Complete a reasoning trace
+- `memory_get_observations` — Get observational memory
+- `graph_query` — Execute custom Cypher queries
+
+## Testing
+
+Start the MCP server manually to verify it works:
+
+```bash
+make mcp-server
+```
+
+Or use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) to test tools:
+
+```bash
+npx @modelcontextprotocol/inspector uv run --directory ./backend python -m neo4j_agent_memory.mcp.server
+```
