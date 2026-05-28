@@ -72,11 +72,17 @@ def _parse_brd(json_text: str, *, repo_id: str, model: str, strategy: Strategy) 
     )
 
 
+def _resolve_model() -> str:
+    """Pick the BRD model id, appending the 1M-context suffix only if not already present."""
+    base = os.getenv("BRD_MODEL", "claude-opus-4-7")
+    return base if "[" in base else f"{base}[1m]"
+
+
 class Generator:
     def __init__(self, anthropic, model: str | None = None,
                  max_tokens: int = 16_000) -> None:
         self.anthropic = anthropic
-        self.model = model or os.getenv("BRD_MODEL", "claude-opus-4-7") + "[1m]"
+        self.model = model or _resolve_model()
         self.max_tokens = max_tokens
         self.token_usage = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
 
