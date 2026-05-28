@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import json as _json
 import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from code_context_graph.brd import generate_brd
+from code_context_graph.brd.storage import BRDStorage
 from code_context_graph.github_client import (
     clone_repo,
     delete_cloned_repo,
@@ -25,6 +29,7 @@ from code_context_graph.queries import CodeGraphQueries
 from code_context_graph.repo_manager import RepoManager
 
 _client: Neo4jClient | None = None
+_brd_jobs: dict[str, dict] = {}  # repo_id -> latest job status
 
 
 def get_client() -> Neo4jClient:
@@ -134,6 +139,80 @@ def _ingest_repo(slug: str, url: str, local_path: Path) -> dict:
 def list_repos() -> list[dict]:
     client = get_client()
     return RepoManager(client).list_repos()
+
+
+# --------------- BRD ---------------
+# Registered before /api/repos/{slug:path} so the specific BRD routes
+# take precedence over the catch-all repo slug routes.
+
+
+def _run_brd_job(repo_id: str, max_retries: int | None, force_map_reduce: bool) -> None:
+    try:
+        result = generate_brd(
+            repo_id=repo_id,
+            max_retries=max_retries,
+            force_map_reduce=force_map_reduce,
+            client=get_client(),
+        )
+        _brd_jobs[repo_id] = {
+            "status": "done", "brd_id": result.brd_id, "rating": result.rating.value,
+            "weighted_score": result.weighted_score, "attempts": result.attempts,
+            "version": result.version, "html_path": result.html_path,
+            "created_at": result.created_at.isoformat(),
+            "strategy": result.strategy.value,
+        }
+    except Exception as exc:
+        _brd_jobs[repo_id] = {"status": "error", "error": str(exc)}
+
+
+@app.post("/api/repos/{repo_id}/brd")
+def start_brd(
+    repo_id: str,
+    background: BackgroundTasks,
+    max_retries: int | None = Query(None),
+    force_map_reduce: bool = Query(False),
+) -> dict:
+    _brd_jobs[repo_id] = {"status": "running"}
+    background.add_task(_run_brd_job, repo_id, max_retries, force_map_reduce)
+    return {"status": "running", "repo_id": repo_id}
+
+
+@app.get("/api/repos/{repo_id}/brd/{brd_id}/html", response_class=HTMLResponse)
+def get_brd_html(repo_id: str, brd_id: str) -> HTMLResponse:
+    client = get_client()
+    rows = client.run("MATCH (b:BRD {id: $id}) RETURN b.html AS html", id=brd_id)
+    if not rows:
+        raise HTTPException(404, f"BRD not found: {brd_id}")
+    return HTMLResponse(rows[0]["html"])
+
+
+@app.get("/api/repos/{repo_id}/brd")
+def get_brd(repo_id: str, all: bool = Query(False)) -> dict | list:
+    client = get_client()
+    storage = BRDStorage(client)
+    if all:
+        return storage.list_versions(repo_id)
+    rows = client.run(
+        "MATCH (r:Repository {slug: $repo_id})-[:HAS_BRD]->(b:BRD) "
+        "RETURN b ORDER BY b.version DESC LIMIT 1",
+        repo_id=repo_id,
+    )
+    if not rows:
+        job = _brd_jobs.get(repo_id)
+        if job:
+            return job
+        raise HTTPException(404, f"No BRD for {repo_id}")
+    b = rows[0]["b"]
+    attempt_history = b.get("attempt_history")
+    if isinstance(attempt_history, str):
+        attempt_history = _json.loads(attempt_history)
+    return {
+        "id": b.get("id"), "version": b.get("version"),
+        "rating": b.get("rating"), "weighted_score": b.get("weighted_score"),
+        "attempts": b.get("attempts"), "model": b.get("model"),
+        "strategy": b.get("strategy"), "created_at": b.get("created_at"),
+        "attempt_history": attempt_history,
+    }
 
 
 @app.get("/api/repos/{slug:path}")
