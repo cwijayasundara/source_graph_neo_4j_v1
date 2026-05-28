@@ -172,6 +172,9 @@ def start_brd(
     max_retries: int | None = Query(None),
     force_map_reduce: bool = Query(False),
 ) -> dict:
+    existing = _brd_jobs.get(repo_id)
+    if existing and existing.get("status") == "running":
+        raise HTTPException(409, f"BRD generation already in progress for {repo_id}")
     _brd_jobs[repo_id] = {"status": "running"}
     background.add_task(_run_brd_job, repo_id, max_retries, force_map_reduce)
     return {"status": "running", "repo_id": repo_id}
@@ -180,7 +183,12 @@ def start_brd(
 @app.get("/api/repos/{repo_id}/brd/{brd_id}/html", response_class=HTMLResponse)
 def get_brd_html(repo_id: str, brd_id: str) -> HTMLResponse:
     client = get_client()
-    rows = client.run("MATCH (b:BRD {id: $id}) RETURN b.html AS html", id=brd_id)
+    rows = client.run(
+        "MATCH (r:Repository {slug: $repo_id})-[:HAS_BRD]->(b:BRD {id: $brd_id}) "
+        "RETURN b.html AS html",
+        repo_id=repo_id,
+        brd_id=brd_id,
+    )
     if not rows:
         raise HTTPException(404, f"BRD not found: {brd_id}")
     return HTMLResponse(rows[0]["html"])

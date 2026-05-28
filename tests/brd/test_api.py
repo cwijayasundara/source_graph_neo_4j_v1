@@ -49,3 +49,16 @@ def test_get_brd_html_returns_html_content_type():
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("text/html")
         assert "<body>ok</body>" in resp.text
+
+
+def test_post_brd_409_when_already_running():
+    from code_context_graph.api import app, _brd_jobs
+    from fastapi.testclient import TestClient
+
+    _brd_jobs["acme-busy"] = {"status": "running"}
+    try:
+        client = TestClient(app)
+        resp = client.post("/api/repos/acme-busy/brd")
+        assert resp.status_code == 409
+    finally:
+        _brd_jobs.pop("acme-busy", None)

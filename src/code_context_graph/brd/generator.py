@@ -146,7 +146,7 @@ class Generator:
             except Exception as exc:
                 sub_brds.append(BRD(
                     sections=[BRDSection(title="Executive Summary",
-                                         body_markdown=f"<cluster failed to generate; partial: {exc!r}>",
+                                         body_markdown=f"<cluster failed to generate; partial: {type(exc).__name__}>",
                                          requirements=[])],
                     evidence_map={}, repo_id=ctx.repo_id, model=self.model,
                     strategy=Strategy.map_reduce,
