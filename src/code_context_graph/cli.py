@@ -180,3 +180,43 @@ def complex(
         for row in results:
             table.add_row(*[str(v) for v in row.values()])
         console.print(table)
+
+
+@app.command()
+def brd(
+    repo: str = typer.Argument(..., help="Repo slug (or local path) to generate a BRD for."),
+    max_retries: int = typer.Option(None, "--max-retries", help="Override BRD_MAX_RETRIES."),
+    force_map_reduce: bool = typer.Option(False, "--force-map-reduce",
+                                          help="Use map-reduce even if repo fits in context."),
+    output_dir: str = typer.Option(None, "--output-dir", help="Override BRD_OUTPUT_DIR."),
+    open_browser: bool = typer.Option(False, "--open", help="Open the BRD in the default browser."),
+) -> None:
+    """Generate a Business Requirements Document for an ingested repo."""
+    import os
+    import webbrowser
+    from code_context_graph.brd import generate_brd
+    from code_context_graph.brd.schema import Rating
+
+    if output_dir:
+        os.environ["BRD_OUTPUT_DIR"] = output_dir
+
+    console.print(f"[cyan]Generating BRD for {repo}...[/cyan]")
+    result = generate_brd(
+        repo_id=repo,
+        max_retries=max_retries,
+        force_map_reduce=force_map_reduce,
+    )
+    badge = {"high": "green", "medium": "yellow", "low": "red"}[result.rating.value]
+    console.print(
+        f"[{badge}]Rating: {result.rating.value}[/{badge}] "
+        f"(weighted score {result.weighted_score:.2f}, "
+        f"{result.attempts} attempt(s), strategy {result.strategy.value})"
+    )
+    console.print(f"HTML written to: {result.html_path}")
+    if open_browser:
+        webbrowser.open(f"file://{result.html_path}")
+    if result.rating == Rating.high:
+        raise typer.Exit(0)
+    if result.rating == Rating.medium:
+        raise typer.Exit(1)
+    raise typer.Exit(2)
