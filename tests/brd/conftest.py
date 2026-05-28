@@ -25,3 +25,37 @@ class FakeNeo4jClient:
 @pytest.fixture
 def fake_client() -> FakeNeo4jClient:
     return FakeNeo4jClient()
+
+
+class FakeAnthropic:
+    """Records messages.create() calls and returns scripted text responses."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+        self._responses: list[str] = []
+        self.messages = self
+
+    def script(self, *texts: str) -> None:
+        self._responses = list(texts)
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        text = self._responses.pop(0) if self._responses else "{}"
+
+        class _Block:
+            def __init__(self, t: str) -> None:
+                self.text = t
+
+        class _Response:
+            def __init__(self, t: str) -> None:
+                self.content = [_Block(t)]
+                self.usage = type("U", (), {"input_tokens": 10, "output_tokens": 5,
+                                            "cache_read_input_tokens": 0,
+                                            "cache_creation_input_tokens": 0})()
+
+        return _Response(text)
+
+
+@pytest.fixture
+def fake_anthropic() -> FakeAnthropic:
+    return FakeAnthropic()
