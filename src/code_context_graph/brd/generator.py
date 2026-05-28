@@ -40,6 +40,13 @@ Rules:
 """
 
 
+REDUCE_SYSTEM = """You are merging multiple cluster-scoped BRDs into a single
+unified BRD for the whole repository. Deduplicate requirements, reconcile
+contradictions, prefer the more specific wording, and keep the 11-section
+structure exactly. Preserve every entity reference (do not drop evidence pointers).
+Return JSON in the same schema as a single BRD."""
+
+
 def _build_user_message(ctx: PromptContext, revision_guidance: str | None) -> str:
     parts: list[str] = []
     parts.append("## Graph summary\n")
@@ -70,6 +77,28 @@ def _parse_brd(json_text: str, *, repo_id: str, model: str, strategy: Strategy) 
         model=model,
         strategy=strategy,
     )
+
+
+def _build_cluster_message(ctx: PromptContext, cluster_files: list[str],
+                           revision_guidance: str | None) -> str:
+    source_by_path = dict(ctx.files)
+    parts: list[str] = ["## Graph summary\n", ctx.summary_text,
+                        f"\n\n## Cluster files ({len(cluster_files)} files)\n"]
+    for path in cluster_files:
+        src = source_by_path.get(path, "")
+        parts.append(f"\n### {path}\n```\n{src}\n```\n")
+    if revision_guidance:
+        parts.append("\n\n## Judge feedback to address\n")
+        parts.append(revision_guidance)
+    return "".join(parts)
+
+
+def _build_reduce_message(sub_brds: list[BRD], revision_guidance: str | None) -> str:
+    payload = [b.model_dump(mode="json") for b in sub_brds]
+    text = "## Sub-BRDs to merge\n```json\n" + json.dumps(payload) + "\n```"
+    if revision_guidance:
+        text += "\n\n## Judge feedback to address\n" + revision_guidance
+    return text
 
 
 def _resolve_model() -> str:
@@ -106,5 +135,34 @@ class Generator:
             text = self._call(_build_user_message(ctx, revision_guidance))
             return _parse_brd(text, repo_id=ctx.repo_id, model=self.model,
                               strategy=Strategy.single_shot)
-        # map_reduce path implemented in Task 8
-        raise NotImplementedError("map_reduce path added in Task 8")
+        if not ctx.clusters:
+            raise ValueError("map_reduce strategy requires clusters")
+        # map
+        sub_brds: list[BRD] = []
+        for cluster_files in ctx.clusters:
+            try:
+                cluster_text = self._call(_build_cluster_message(ctx, cluster_files, revision_guidance))
+                sub_brds.append(_parse_brd(cluster_text, repo_id=ctx.repo_id, model=self.model,
+                                            strategy=Strategy.map_reduce))
+            except Exception:
+                # one failed cluster becomes a partial; reduce sees the gap
+                sub_brds.append(BRD(
+                    sections=[BRDSection(title="Executive Summary",
+                                         body_markdown="<cluster failed to generate; partial>",
+                                         requirements=[])],
+                    evidence_map={}, repo_id=ctx.repo_id, model=self.model,
+                    strategy=Strategy.map_reduce,
+                ))
+        # reduce
+        response = self.anthropic.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            system=REDUCE_SYSTEM,
+            messages=[{"role": "user", "content": _build_reduce_message(sub_brds, revision_guidance)}],
+        )
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            self.token_usage["input"] += getattr(usage, "input_tokens", 0) or 0
+            self.token_usage["output"] += getattr(usage, "output_tokens", 0) or 0
+        return _parse_brd(response.content[0].text, repo_id=ctx.repo_id,
+                          model=self.model, strategy=Strategy.map_reduce)
