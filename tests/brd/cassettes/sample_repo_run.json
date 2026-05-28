@@ -1,0 +1,8 @@
+{
+  "generator_responses": [
+    "{\"sections\":[{\"title\":\"Executive Summary\",\"body_markdown\":\"...\",\"requirements\":[]},{\"title\":\"Business Objectives\",\"body_markdown\":\"...\",\"requirements\":[]},{\"title\":\"Scope\",\"body_markdown\":\"...\",\"requirements\":[]},{\"title\":\"Stakeholders\",\"body_markdown\":\"...\",\"requirements\":[]},{\"title\":\"Functional Requirements\",\"body_markdown\":\"\",\"requirements\":[{\"id\":\"FR-1\",\"text\":\"Parse Python source files into a graph.\"}]},{\"title\":\"Non-functional Requirements\",\"body_markdown\":\"\",\"requirements\":[]},{\"title\":\"Data & Integrations\",\"body_markdown\":\"\",\"requirements\":[]},{\"title\":\"Assumptions\",\"body_markdown\":\"\",\"requirements\":[]},{\"title\":\"Constraints\",\"body_markdown\":\"\",\"requirements\":[]},{\"title\":\"Risks\",\"body_markdown\":\"\",\"requirements\":[]},{\"title\":\"Success Metrics\",\"body_markdown\":\"\",\"requirements\":[]}],\"evidence_map\":{\"FR-1\":[\"src/code_context_graph/parser.py\"]}}"
+  ],
+  "judge_responses": [
+    "{\"dimensions\":{\"completeness\":{\"score\":5,\"rationale\":\"all 11\"},\"accuracy\":{\"score\":5,\"rationale\":\"grounded\"},\"clarity\":{\"score\":4,\"rationale\":\"ok\"},\"consistency\":{\"score\":4,\"rationale\":\"ok\"},\"actionability\":{\"score\":4,\"rationale\":\"ok\"}},\"feedback\":[]}"
+  ]
+}
