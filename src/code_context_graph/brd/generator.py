@@ -115,11 +115,11 @@ class Generator:
         self.max_tokens = max_tokens
         self.token_usage = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
 
-    def _call(self, user_message: str) -> str:
+    def _call(self, user_message: str, *, system: str = SYSTEM_PROMPT) -> str:
         response = self.anthropic.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
-            system=SYSTEM_PROMPT,
+            system=system,
             messages=[{"role": "user", "content": user_message}],
         )
         usage = getattr(response, "usage", None)
@@ -137,32 +137,21 @@ class Generator:
                               strategy=Strategy.single_shot)
         if not ctx.clusters:
             raise ValueError("map_reduce strategy requires clusters")
-        # map
         sub_brds: list[BRD] = []
         for cluster_files in ctx.clusters:
             try:
                 cluster_text = self._call(_build_cluster_message(ctx, cluster_files, revision_guidance))
                 sub_brds.append(_parse_brd(cluster_text, repo_id=ctx.repo_id, model=self.model,
                                             strategy=Strategy.map_reduce))
-            except Exception:
-                # one failed cluster becomes a partial; reduce sees the gap
+            except Exception as exc:
                 sub_brds.append(BRD(
                     sections=[BRDSection(title="Executive Summary",
-                                         body_markdown="<cluster failed to generate; partial>",
+                                         body_markdown=f"<cluster failed to generate; partial: {exc!r}>",
                                          requirements=[])],
                     evidence_map={}, repo_id=ctx.repo_id, model=self.model,
                     strategy=Strategy.map_reduce,
                 ))
-        # reduce
-        response = self.anthropic.messages.create(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            system=REDUCE_SYSTEM,
-            messages=[{"role": "user", "content": _build_reduce_message(sub_brds, revision_guidance)}],
-        )
-        usage = getattr(response, "usage", None)
-        if usage is not None:
-            self.token_usage["input"] += getattr(usage, "input_tokens", 0) or 0
-            self.token_usage["output"] += getattr(usage, "output_tokens", 0) or 0
-        return _parse_brd(response.content[0].text, repo_id=ctx.repo_id,
-                          model=self.model, strategy=Strategy.map_reduce)
+        reduce_text = self._call(_build_reduce_message(sub_brds, revision_guidance),
+                                 system=REDUCE_SYSTEM)
+        return _parse_brd(reduce_text, repo_id=ctx.repo_id, model=self.model,
+                          strategy=Strategy.map_reduce)
