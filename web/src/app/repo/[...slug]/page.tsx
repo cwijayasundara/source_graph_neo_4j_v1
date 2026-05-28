@@ -9,6 +9,7 @@ import { QueryPanel } from "@/components/QueryPanel";
 import { AskCodebasePanel } from "@/components/AskCodebasePanel";
 import { SearchBar } from "@/components/SearchBar";
 import { EntityPanel } from "@/components/EntityPanel";
+import BRDPanel from "@/components/BRDPanel";
 import { ArrowLeft, Box, FileText, GitBranch, Network, Users } from "lucide-react";
 
 export default function RepoPage() {
@@ -97,6 +98,7 @@ export default function RepoPage() {
 
         <AskCodebasePanel repo={slug} />
         <QueryPanel repo={slug} />
+        <BRDPanel repoId={slug} />
       </main>
     </div>
   );
