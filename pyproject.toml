@@ -21,6 +21,9 @@ dependencies = [
   "tree-sitter-rust>=0.24.2",
   "tree-sitter-java>=0.23.5",
   "anthropic>=0.40",
+  "markdown-it-py>=3.0",
+  "mdit-py-plugins>=0.4",
+  "bleach>=6.1",
 ]
 
 [project.scripts]
