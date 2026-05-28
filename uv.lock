@@ -78,6 +78,7 @@ name = "code-context-graph"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "fastapi" },
     { name = "gitpython" },
     { name = "httpx" },
@@ -96,11 +97,6 @@ dependencies = [
     { name = "uvicorn", extra = ["standard"] },
 ]
 
-[package.optional-dependencies]
-llm = [
-    { name = "anthropic" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
@@ -108,7 +104,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anthropic", marker = "extra == 'llm'", specifier = ">=0.40" },
+    { name = "anthropic", specifier = ">=0.40" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "gitpython", specifier = ">=3.1" },
     { name = "httpx", specifier = ">=0.27" },
@@ -126,7 +122,6 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
-provides-extras = ["llm"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.0.3" }]
