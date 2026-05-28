@@ -33,6 +33,73 @@ class PromptContext:
     estimated_tokens: int
 
 
+def estimate_tokens(text: str) -> int:
+    """Char-over-4 heuristic; cheap and good enough for budget gating."""
+    return len(text) // 4
+
+
+def _format_summary_text(summary: "GraphSummary") -> str:
+    lines: list[str] = []
+    lines.append(f"# Repository: {summary.repo_id}")
+    if summary.url:
+        lines.append(f"Source: {summary.url}")
+    lines.append(
+        f"Files parsed: {summary.files_parsed} | "
+        f"Entities: {summary.entities} | Relationships: {summary.relationships}"
+    )
+    lines.append("\n## Relationship distribution")
+    for rel, count in summary.relationship_counts.items():
+        lines.append(f"- {rel}: {count}")
+    lines.append("\n## Top entities (by graph centrality)")
+    for e in summary.top_entities:
+        sig = e.get("signature") or ""
+        layer = e.get("semantic_layer") or ""
+        summary_str = e.get("semantic_summary") or ""
+        lines.append(
+            f"- [{e['kind']}] {e['qualified_name']}"
+            + (f" — {layer}" if layer else "")
+            + (f" — {summary_str}" if summary_str else "")
+        )
+    return "\n".join(lines)
+
+
+def _load_source(repo_path: Path, file_path: str) -> str | None:
+    full = (repo_path / file_path)
+    try:
+        return full.read_text(encoding="utf-8", errors="replace")
+    except (FileNotFoundError, IsADirectoryError, PermissionError):
+        return None
+
+
+def _cluster_by_top_dir(file_paths: list[str], depth: int = 1) -> dict[str, list[str]]:
+    clusters: dict[str, list[str]] = {}
+    for fp in file_paths:
+        parts = fp.split("/")
+        key = "/".join(parts[:depth]) if len(parts) > depth else parts[0]
+        clusters.setdefault(key, []).append(fp)
+    return clusters
+
+
+def _split_oversized_cluster(
+    files: list[tuple[str, str]],
+    budget: int,
+    current_depth: int,
+    max_depth: int,
+) -> list[list[tuple[str, str]]]:
+    """If a cluster overruns the budget, recursively split by deeper directory."""
+    total = sum(estimate_tokens(src) for _, src in files)
+    if total <= budget or current_depth >= max_depth:
+        return [files]
+    paths = [fp for fp, _ in files]
+    sub = _cluster_by_top_dir(paths, depth=current_depth + 1)
+    result: list[list[tuple[str, str]]] = []
+    source_by_path = dict(files)
+    for cluster_files in sub.values():
+        sub_pairs = [(p, source_by_path[p]) for p in cluster_files]
+        result.extend(_split_oversized_cluster(sub_pairs, budget, current_depth + 1, max_depth))
+    return result
+
+
 class ContextBuilder:
     """Build the prompt context for the BRD generator from the Neo4j graph + source on disk."""
 
@@ -107,3 +174,34 @@ class ContextBuilder:
             repo_id=repo_id,
         )
         return [RankedFile(file_path=row["file_path"], centrality=int(row["centrality"])) for row in rows]
+
+    def build(self, repo_id: str, *, repo_path: Path, force_map_reduce: bool = False) -> PromptContext:
+        summary = self.build_graph_summary(repo_id)
+        summary_text = _format_summary_text(summary)
+        ranked = self.rank_files(repo_id)
+        files: list[tuple[str, str]] = []
+        for rf in ranked:
+            src = _load_source(repo_path, rf.file_path)
+            if src is not None:
+                files.append((rf.file_path, src))
+        source_tokens = sum(estimate_tokens(src) for _, src in files)
+        total = estimate_tokens(summary_text) + source_tokens
+        if not force_map_reduce and total <= self.single_shot_budget:
+            return PromptContext(
+                repo_id=repo_id, summary_text=summary_text, files=files,
+                strategy="single_shot", clusters=None, estimated_tokens=total,
+            )
+        # map-reduce
+        clusters_map = _cluster_by_top_dir([fp for fp, _ in files], depth=1)
+        source_by_path = dict(files)
+        all_clusters: list[list[str]] = []
+        for cluster_files in clusters_map.values():
+            sub_pairs = [(p, source_by_path[p]) for p in cluster_files]
+            for split in _split_oversized_cluster(
+                sub_pairs, self.single_shot_budget, current_depth=1, max_depth=self.max_cluster_depth
+            ):
+                all_clusters.append([p for p, _ in split])
+        return PromptContext(
+            repo_id=repo_id, summary_text=summary_text, files=files,
+            strategy="map_reduce", clusters=all_clusters, estimated_tokens=total,
+        )
