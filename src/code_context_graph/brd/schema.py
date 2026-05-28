@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
 EvidenceMap = dict[str, list[str]]
 """requirement_id -> list of graph entity ids and/or source file paths."""
+
+
+Severity = Literal["low", "medium", "high"]
 
 
 class Rating(str, Enum):
@@ -36,7 +40,7 @@ class DimensionScore(BaseModel):
 
 class FeedbackItem(BaseModel):
     dimension: Dimension
-    severity: str  # "low" | "medium" | "high"
+    severity: Severity
     suggestion: str
     target_section: str
 

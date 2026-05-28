@@ -30,7 +30,7 @@ def test_brd_with_evidence_map():
     assert brd.evidence_map["FR-1"] == ["Function:src/x.py:foo"]
 
 
-def test_judge_report_rating_computed_from_weighted_score():
+def test_judge_report_construction_with_dimensions():
     scores = {
         Dimension.completeness: DimensionScore(score=5, rationale="ok"),
         Dimension.accuracy: DimensionScore(score=5, rationale="ok"),
