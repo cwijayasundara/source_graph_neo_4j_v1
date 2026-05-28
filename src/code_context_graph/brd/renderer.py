@@ -16,6 +16,7 @@ _ALLOWED_TAGS = [
     "thead", "tbody", "tr", "td", "th", "a",
 ]
 _ALLOWED_ATTRS = {"a": ["href", "title"]}
+_ALLOWED_PROTOCOLS = ["http", "https", "mailto"]
 
 _INLINE_CSS = """
 :root { color-scheme: light dark; }
@@ -39,7 +40,13 @@ code { background: #f6f8fa; padding: 0.2em 0.4em; border-radius: 4px; }
 def _section_to_html(section: BRDSection) -> str:
     body_md = section.body_markdown or ""
     rendered = _MD.render(body_md)
-    safe_body = bleach.clean(rendered, tags=_ALLOWED_TAGS, attributes=_ALLOWED_ATTRS, strip=False)
+    safe_body = bleach.clean(
+        rendered,
+        tags=_ALLOWED_TAGS,
+        attributes=_ALLOWED_ATTRS,
+        protocols=_ALLOWED_PROTOCOLS,
+        strip=False,
+    )
     parts = [f"<h2>{html_lib.escape(section.title)}</h2>", safe_body]
     for req in section.requirements:
         parts.append(

@@ -62,3 +62,12 @@ def test_render_evidence_map_section():
     html = render_html(_sample_brd())
     assert "Evidence" in html
     assert "Function:src/auth.py:login" in html
+
+
+def test_render_strips_javascript_url_scheme():
+    brd = _sample_brd()
+    brd.sections[0].body_markdown = "Click [me](javascript:alert(1)) please"
+    html = render_html(brd)
+    # No live anchor pointing at a javascript: URL must survive sanitization.
+    assert 'href="javascript:' not in html
+    assert "<a href=\"javascript:" not in html
