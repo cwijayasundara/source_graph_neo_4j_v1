@@ -52,7 +52,6 @@ def _format_summary_text(summary: "GraphSummary") -> str:
         lines.append(f"- {rel}: {count}")
     lines.append("\n## Top entities (by graph centrality)")
     for e in summary.top_entities:
-        sig = e.get("signature") or ""
         layer = e.get("semantic_layer") or ""
         summary_str = e.get("semantic_summary") or ""
         lines.append(
