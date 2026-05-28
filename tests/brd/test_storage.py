@@ -22,7 +22,7 @@ def _sample_judge_report() -> JudgeReport:
 
 def test_save_writes_html_file_and_returns_path(tmp_path, fake_client):
     storage = BRDStorage(fake_client, output_dir=tmp_path)
-    fake_client.script([{"max_version": None}])  # no prior versions
+    fake_client.script([{"version": 1}])  # save returns version=1
 
     result = storage.save(
         repo_id="acme-app",
@@ -44,9 +44,9 @@ def test_save_writes_html_file_and_returns_path(tmp_path, fake_client):
     assert path.parent.name == "acme-app"
 
 
-def test_save_increments_version(tmp_path, fake_client):
+def test_save_uses_returned_version(tmp_path, fake_client):
     storage = BRDStorage(fake_client, output_dir=tmp_path)
-    fake_client.script([{"max_version": 3}])
+    fake_client.script([{"version": 4}])
 
     result = storage.save(
         repo_id="acme-app",
@@ -58,3 +58,23 @@ def test_save_increments_version(tmp_path, fake_client):
         token_usage={},
     )
     assert result.version == 4
+
+
+def test_save_raises_when_repository_missing(tmp_path, fake_client):
+    import pytest
+    storage = BRDStorage(fake_client, output_dir=tmp_path)
+    fake_client.script([])  # empty result -> repo doesn't exist
+
+    with pytest.raises(ValueError, match="Repository not found"):
+        storage.save(
+            repo_id="missing-repo",
+            html="<p>x</p>",
+            judge_report=_sample_judge_report(),
+            attempt_history=[],
+            model="m",
+            strategy=Strategy.single_shot,
+            token_usage={},
+        )
+
+    # No HTML file should have been written
+    assert not list((tmp_path / "brd" / "missing-repo").glob("*.html")) if (tmp_path / "brd" / "missing-repo").exists() else True

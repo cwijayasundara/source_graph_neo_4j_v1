@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from code_context_graph.brd.schema import (
-    AttemptRecord, BRDResult, JudgeReport, Rating, Strategy,
+    AttemptRecord, BRDResult, JudgeReport, Strategy,
 )
 
 
@@ -26,15 +26,6 @@ class BRDStorage:
         self.client = client
         out = output_dir or os.getenv("BRD_OUTPUT_DIR", "./brd_output")
         self.output_dir = Path(out).resolve()
-
-    def _next_version(self, repo_id: str) -> int:
-        rows = self.client.run(
-            "MATCH (r:Repository {slug: $repo_id})-[:HAS_BRD]->(b:BRD) "
-            "RETURN max(b.version) AS max_version",
-            repo_id=repo_id,
-        )
-        prev = rows[0].get("max_version") if rows else None
-        return (prev or 0) + 1
 
     def _write_html(self, repo_id: str, version: int, html: str) -> Path:
         repo_dir = self.output_dir / "brd" / _slugify(repo_id)
@@ -54,18 +45,18 @@ class BRDStorage:
         strategy: Strategy,
         token_usage: dict[str, int],
     ) -> BRDResult:
-        version = self._next_version(repo_id)
-        path = self._write_html(repo_id, version, html)
         brd_id = str(uuid.uuid4())
         created_at = datetime.now(timezone.utc)
 
-        self.client.run(
+        rows = self.client.run(
             """
             MATCH (r:Repository {slug: $repo_id})
+            OPTIONAL MATCH (r)-[:HAS_BRD]->(prev:BRD)
+            WITH r, coalesce(max(prev.version), 0) + 1 AS version
             CREATE (b:BRD {
                 id: $id,
                 repo_id: $repo_id,
-                version: $version,
+                version: version,
                 html: $html,
                 rating: $rating,
                 weighted_score: $weighted_score,
@@ -78,10 +69,10 @@ class BRDStorage:
                 created_at: $created_at
             })
             CREATE (r)-[:HAS_BRD]->(b)
+            RETURN b.version AS version
             """,
             id=brd_id,
             repo_id=repo_id,
-            version=version,
             html=html,
             rating=judge_report.rating.value,
             weighted_score=judge_report.weighted_score,
@@ -93,6 +84,12 @@ class BRDStorage:
             token_usage=json.dumps(token_usage),
             created_at=created_at.isoformat(),
         )
+
+        if not rows:
+            raise ValueError(f"Repository not found: {repo_id}")
+
+        version = rows[0]["version"]
+        path = self._write_html(repo_id, version, html)
 
         return BRDResult(
             brd_id=brd_id,
