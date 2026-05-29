@@ -16,7 +16,8 @@ _extractors: list[RepoExtractor] = []
 
 
 def register_repo_extractor(fn: RepoExtractor) -> None:
-    _extractors.append(fn)
+    if fn not in _extractors:
+        _extractors.append(fn)
 
 
 def run_repo_extractors(repo_root: Path) -> list[ParseResult]:

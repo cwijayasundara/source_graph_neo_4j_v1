@@ -39,3 +39,13 @@ def test_runs_extractors_in_registration_order(isolated_registry):
 
 def test_run_with_no_extractors_returns_empty(isolated_registry):
     assert run_repo_extractors(Path(".")) == []
+
+
+def test_importing_package_registers_cobol_extractor():
+    # Importing the package wires the COBOL repo extractor into the registry.
+    # (Guards against accidental removal of the registration import in __init__.)
+    import code_context_graph  # noqa: F401  (triggers package __init__)
+    assert any(
+        getattr(fn, "__name__", "") == "_cobol_repo_extractor"
+        for fn in reg._extractors
+    )
