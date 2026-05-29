@@ -17,6 +17,10 @@ class EntityKind(str, Enum):
     ENUM_MEMBER = "EnumMember"
     IMPORT = "Import"
     DECORATOR = "Decorator"
+    PROGRAM = "Program"
+    SECTION = "Section"
+    PARAGRAPH = "Paragraph"
+    COPYBOOK = "Copybook"
 
 
 class RelKind(str, Enum):
@@ -52,6 +56,7 @@ class CodeEntity(BaseModel):
     decorators: list[str] = Field(default_factory=list)
     base_classes: list[str] = Field(default_factory=list)
     complexity: int | None = None
+    is_external: bool = False
 
 
 class CodeRelationship(BaseModel):
