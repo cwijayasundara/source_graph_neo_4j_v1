@@ -72,6 +72,7 @@ class CodeGraphIngester:
             "end_line": entity.end_line,
             "is_async": entity.is_async,
             "is_private": entity.is_private,
+            "is_external": entity.is_external,
         }
         if entity.docstring:
             props["docstring"] = entity.docstring
