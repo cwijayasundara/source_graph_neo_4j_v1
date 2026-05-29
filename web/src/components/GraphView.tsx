@@ -244,6 +244,10 @@ export function GraphView({ repo, onNodeClick }: Props) {
               Constant: 2,
               GlobalVar: 2,
               External: 2,
+              Program: 8,
+              Section: 5,
+              Paragraph: 3,
+              Copybook: 3,
             };
             return sizes[node.kind] ?? 2;
           }}

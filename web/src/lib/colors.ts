@@ -11,6 +11,10 @@ export const KIND_COLORS: Record<string, string> = {
   Import: "#94a3b8",
   Decorator: "#ec4899",
   File: "#3b82f6",
+  Program: "#0ea5e9",
+  Section: "#22d3ee",
+  Paragraph: "#2dd4bf",
+  Copybook: "#a78bfa",
 };
 
 export const REL_COLORS: Record<string, string> = {
