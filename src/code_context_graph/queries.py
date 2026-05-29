@@ -19,12 +19,22 @@ class CodeGraphQueries:
             params["repo"] = repo
         return params
 
+    @staticmethod
+    def _name_match(alias: str) -> str:
+        """Case-insensitive match on simple or qualified name. Matters for COBOL,
+        whose entity names are stored UPPERCASE, so a user typing lowercase still
+        matches."""
+        return (
+            f"(toLower({alias}.simple_name) = toLower($name) "
+            f"OR toLower({alias}.qualified_name) = toLower($name))"
+        )
+
     def what_calls(self, function_name: str, repo: str | None = None) -> list[dict]:
         """Find all callers of a given function/method."""
         return self.client.run(
             f"""
             MATCH (caller:CodeEntity)-[:CALLS]->(target:CodeEntity)
-            WHERE (target.simple_name = $name OR target.qualified_name = $name)
+            WHERE {self._name_match("target")}
             {self._repo_filter("caller", repo)}
             RETURN caller.qualified_name AS caller,
                    caller.kind AS kind,
@@ -39,7 +49,7 @@ class CodeGraphQueries:
         return self.client.run(
             f"""
             MATCH (caller:CodeEntity)-[:CALLS]->(callee:CodeEntity)
-            WHERE (caller.simple_name = $name OR caller.qualified_name = $name)
+            WHERE {self._name_match("caller")}
             {self._repo_filter("caller", repo)}
             RETURN callee.qualified_name AS callee,
                    callee.kind AS kind,
@@ -54,14 +64,18 @@ class CodeGraphQueries:
         return self.client.run(
             """
             MATCH path = (target:CodeEntity)<-[:CALLS*1..%(depth)d]-(affected:CodeEntity)
-            WHERE (target.simple_name = $name OR target.qualified_name = $name)
+            WHERE %(name_match)s
             %(repo_filter)s
             RETURN DISTINCT affected.qualified_name AS affected,
                    affected.kind AS kind,
                    affected.file_path AS file,
                    length(path) AS distance
             ORDER BY distance, affected.file_path
-            """ % {"depth": depth, "repo_filter": self._repo_filter("affected", repo)},
+            """ % {
+                "depth": depth,
+                "repo_filter": self._repo_filter("affected", repo),
+                "name_match": self._name_match("target"),
+            },
             **self._params(repo, name=entity_name),
         )
 
@@ -70,7 +84,7 @@ class CodeGraphQueries:
         return self.client.run(
             f"""
             MATCH path = (child:CodeEntity)-[:INHERITS*1..5]->(parent:CodeEntity)
-            WHERE (child.simple_name = $name OR child.qualified_name = $name)
+            WHERE {self._name_match("child")}
             {self._repo_filter("child", repo)}
             RETURN [n IN nodes(path) | n.qualified_name] AS chain
             """,
@@ -82,7 +96,7 @@ class CodeGraphQueries:
         return self.client.run(
             f"""
             MATCH (m:CodeEntity)-[:IMPORTS]->(dep:CodeEntity)
-            WHERE (m.simple_name = $name OR m.qualified_name = $name)
+            WHERE {self._name_match("m")}
             {self._repo_filter("m", repo)}
             RETURN dep.qualified_name AS dependency,
                    dep.kind AS kind
@@ -96,9 +110,8 @@ class CodeGraphQueries:
         return self.client.run(
             f"""
             MATCH (importer:CodeEntity)-[:IMPORTS]->(target:CodeEntity)
-            WHERE (target.simple_name = $name
-               OR target.qualified_name = $name
-               OR target.qualified_name STARTS WITH $name)
+            WHERE ({self._name_match("target")}
+               OR toLower(target.qualified_name) STARTS WITH toLower($name))
             {self._repo_filter("importer", repo)}
             RETURN DISTINCT importer.qualified_name AS importer,
                    importer.file_path AS file
@@ -112,7 +125,7 @@ class CodeGraphQueries:
         return self.client.run(
             f"""
             MATCH path = (entry:CodeEntity)-[:CALLS*1..8]->(deep:CodeEntity)
-            WHERE (entry.simple_name = $name OR entry.qualified_name = $name)
+            WHERE {self._name_match("entry")}
             {self._repo_filter("entry", repo)}
             RETURN [n IN nodes(path) | n.qualified_name] AS call_chain,
                    length(path) AS depth
@@ -126,7 +139,7 @@ class CodeGraphQueries:
         return self.client.run(
             f"""
             MATCH (a:CodeEntity)-[r:CO_CHANGED_WITH]-(b:CodeEntity)
-            WHERE (a.simple_name = $name OR a.qualified_name = $name)
+            WHERE {self._name_match("a")}
             {self._repo_filter("a", repo)}
             RETURN b.qualified_name AS co_changed_module,
                    b.file_path AS file,

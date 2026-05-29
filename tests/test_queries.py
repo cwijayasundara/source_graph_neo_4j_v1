@@ -32,3 +32,15 @@ def test_what_does_it_call_can_be_scoped_to_repo() -> None:
     query, params = client.calls[0]
     assert "properties(caller).repo = $repo" in query
     assert params == {"name": "handle_message", "repo": "owner/repo"}
+
+
+def test_name_matching_is_case_insensitive() -> None:
+    # COBOL names are stored UPPERCASE; a user typing lowercase must still match.
+    client = FakeClient()
+
+    CodeGraphQueries(client).what_does_it_call("payroll")
+
+    query, params = client.calls[0]
+    assert "toLower(caller.simple_name) = toLower($name)" in query
+    assert "toLower(caller.qualified_name) = toLower($name)" in query
+    assert params == {"name": "payroll"}
