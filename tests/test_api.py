@@ -13,6 +13,7 @@ def test_app_routes_registered() -> None:
     assert "/api/query" in paths
     assert "/api/ask" in paths
     assert "/api/search" in paths
+    assert "/api/suggest" in paths
     assert "/api/stats" in paths
 
 
@@ -62,3 +63,17 @@ def test_get_graph_uses_property_maps_for_optional_node_fields(monkeypatch) -> N
     }
     assert "e.semantic_layer" not in client.queries[0]
     assert "e.semantic_summary" not in client.queries[0]
+
+
+def test_suggest_endpoint_delegates_to_query(monkeypatch) -> None:
+    from code_context_graph import api
+
+    class FakeClient:
+        def run(self, query: str, **params):
+            return [{"qualified_name": "PAYROLL", "simple_name": "PAYROLL", "kind": "Program"}]
+
+    monkeypatch.setattr(api, "get_client", lambda: FakeClient())
+
+    out = api.suggest(q="pay", repo="sample_cobol", limit=10)
+
+    assert out == [{"qualified_name": "PAYROLL", "simple_name": "PAYROLL", "kind": "Program"}]

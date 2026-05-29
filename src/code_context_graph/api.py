@@ -402,6 +402,16 @@ def search_entities(
     return results
 
 
+@app.get("/api/suggest")
+def suggest(
+    q: str = Query(..., min_length=1),
+    repo: str | None = Query(None),
+    limit: int = Query(10, ge=1, le=50),
+) -> list[dict]:
+    client = get_client()
+    return CodeGraphQueries(client).suggest_entities(q, repo, limit)
+
+
 @app.get("/api/stats")
 def get_stats(repo: str | None = Query(None)) -> dict:
     client = get_client()
