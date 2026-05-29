@@ -12,6 +12,10 @@ node_modules/
 .next/
 source_code_to_analyse/cwijayasundara/neo_4j_context_graphs_v1.0/
 
+# COBOL extractor (Java) build output
+tools/cobol-extractor/target/
+tools/cobol-extractor/dependency-reduced-pom.xml
+
 # Stale duplicate files (e.g. "filename 2.py") created by some macOS sync/backup tool
 * 2.py
 * 2.tsx
