@@ -123,6 +123,14 @@ export const api = {
   search: (q: string) =>
     json<Record<string, unknown>[]>(`/api/search?q=${encodeURIComponent(q)}`),
 
+  suggest: (q: string, repo?: string) => {
+    const params = new URLSearchParams({ q });
+    if (repo) params.set("repo", repo);
+    return json<{ qualified_name: string; simple_name: string; kind: string }[]>(
+      `/api/suggest?${params.toString()}`
+    );
+  },
+
   askCodebase: (repo: string, question: string) =>
     json<AskResult>("/api/ask", {
       method: "POST",
