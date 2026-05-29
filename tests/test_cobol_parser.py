@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from code_context_graph.cobol_parser import CobolParser, COBOL_EXTENSIONS
+from code_context_graph.cobol import CobolParser, COBOL_EXTENSIONS
 
 
 def _make_repo(tmp_path: Path) -> Path:
@@ -45,7 +45,7 @@ def test_parse_repo_returns_empty_when_no_cobol(tmp_path):
 
 
 def test_parse_repo_skips_gracefully_when_jar_missing(tmp_path, caplog):
-    caplog.set_level(logging.WARNING, logger="code_context_graph.cobol_parser")
+    caplog.set_level(logging.WARNING, logger="code_context_graph.cobol.parser")
     repo = _make_repo(tmp_path)
     parser = CobolParser(repo, jar_path="/nonexistent/ccg-cobol-extractor.jar")
     assert parser.parse_repo() == []  # COBOL present but no JAR -> skip, no raise
@@ -67,7 +67,7 @@ def test_java_executable_falls_back_to_path(tmp_path):
 
 
 def test_parse_repo_skips_gracefully_when_java_unavailable(tmp_path, monkeypatch, caplog):
-    caplog.set_level(logging.WARNING, logger="code_context_graph.cobol_parser")
+    caplog.set_level(logging.WARNING, logger="code_context_graph.cobol.parser")
     (tmp_path / "A.cbl").write_text("       IDENTIFICATION DIVISION.\n")
     jar = tmp_path / "extractor.jar"
     jar.write_text("")  # jar exists, so we get past the jar check

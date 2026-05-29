@@ -12,7 +12,7 @@ from code_context_graph.models import (
     ParseResult,
     RelKind,
 )
-from code_context_graph.cobol_parser import CobolParser
+from code_context_graph.language_registry import run_repo_extractors
 
 
 TREE_SITTER_EXTENSIONS = {".js", ".jsx", ".ts", ".tsx", ".go", ".rs", ".java"}
@@ -663,6 +663,5 @@ def parse_directory(repo_root: Path, extensions: set[str] | None = None) -> list
                 results.append(tree_sitter_parser.parse_file(path))
         except SyntaxError:
             continue
-    cobol_results = CobolParser.from_env(repo_root).parse_repo()
-    results.extend(cobol_results)
+    results.extend(run_repo_extractors(repo_root))
     return results

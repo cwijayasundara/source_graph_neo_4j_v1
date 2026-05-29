@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from code_context_graph.cobol_parser import CobolParser, SUPPORTED_SCHEMA_VERSION
+from code_context_graph.cobol import CobolParser, SUPPORTED_SCHEMA_VERSION
 
 
 def test_run_extractor_builds_command_and_parses(tmp_path, monkeypatch):

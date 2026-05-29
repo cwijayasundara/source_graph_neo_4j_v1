@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from code_context_graph.cobol_parser import CobolParser
+from code_context_graph.cobol import CobolParser
 
 JAR = os.getenv(
     "CCG_COBOL_EXTRACTOR_JAR",

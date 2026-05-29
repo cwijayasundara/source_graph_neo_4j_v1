@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from code_context_graph.cobol_parser import (
+from code_context_graph.cobol import (
     SUPPORTED_SCHEMA_VERSION,
     cobol_json_to_parse_results,
 )
