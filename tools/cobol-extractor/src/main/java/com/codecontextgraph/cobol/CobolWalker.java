@@ -68,9 +68,16 @@ public class CobolWalker {
                                 rels.add(new RelationshipJson(pQn, progId + "." + target,
                                         "CALLS", relPath, null, Map.of("type", "perform")));
                             }
+                        } else if (stmt instanceof io.proleap.cobol.asg.metamodel.procedure.call.CallStatement call) {
+                            String callee = callTarget(call);
+                            if (callee != null) {
+                                rels.add(new RelationshipJson(progId, callee, "CALLS",
+                                        relPath, null, Map.of("type", "call")));
+                            }
                         }
                     }
                 }
+                addCopyEdges(file, progId, relPath, entities, rels);
             }
             if (entities.stream().noneMatch(e -> e.kind().equals("Program"))) {
                 return new FileResultJson(relPath, "error",
@@ -91,6 +98,7 @@ public class CobolWalker {
         }
         CobolParserParams params = new CobolParserParamsImpl();
         params.setCopyBookDirectories(copybookDirs);
+        params.setCopyBookExtensions(java.util.List.of("", "cpy", "CPY", "cbl", "CBL", "cob", "COB"));
         return new CobolParserRunnerImpl().analyzeFile(file, format, params);
     }
 
@@ -99,6 +107,33 @@ public class CobolWalker {
             return (int) lines.count();
         } catch (Exception e) {
             return 0;
+        }
+    }
+
+    private static String callTarget(io.proleap.cobol.asg.metamodel.procedure.call.CallStatement call) {
+        var vs = call.getProgramValueStmt();
+        if (vs == null || vs.getValue() == null) return null;
+        String name = vs.getValue().toString().replace("'", "").replace("\"", "").trim();
+        return name.isEmpty() ? null : name.toUpperCase();
+    }
+
+    private void addCopyEdges(File file, String progId, String relPath,
+                              List<EntityJson> entities, List<RelationshipJson> rels) {
+        try {
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            java.util.regex.Pattern pat =
+                java.util.regex.Pattern.compile("(?i)\\bCOPY\\s+([A-Z0-9][A-Z0-9-]*)");
+            for (String line : java.nio.file.Files.readAllLines(file.toPath())) {
+                java.util.regex.Matcher m = pat.matcher(line);
+                if (m.find()) {
+                    String name = m.group(1).toUpperCase();
+                    if (seen.add(name)) {
+                        entities.add(new EntityJson("Copybook", name, name, relPath, 0, 0, false));
+                        rels.add(new RelationshipJson(progId, name, "IMPORTS", relPath, null, Map.of()));
+                    }
+                }
+            }
+        } catch (Exception ignored) {
         }
     }
 
