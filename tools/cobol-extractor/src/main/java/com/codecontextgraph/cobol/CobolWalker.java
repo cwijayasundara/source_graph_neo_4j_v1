@@ -13,15 +13,22 @@ import io.proleap.cobol.asg.metamodel.procedure.Statement;
 import io.proleap.cobol.asg.metamodel.procedure.perform.PerformProcedureStatement;
 import io.proleap.cobol.asg.metamodel.procedure.perform.PerformStatement;
 import io.proleap.cobol.asg.metamodel.procedure.Section;
+import io.proleap.cobol.asg.metamodel.procedure.call.CallStatement;
 import io.proleap.cobol.asg.params.CobolParserParams;
 import io.proleap.cobol.asg.params.impl.CobolParserParamsImpl;
 import io.proleap.cobol.asg.runner.impl.CobolParserRunnerImpl;
 import io.proleap.cobol.preprocessor.CobolPreprocessor.CobolSourceFormatEnum;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Walks a ProLeap ASG and produces our JSON-contract objects for a single file.
@@ -81,9 +88,11 @@ public class CobolWalker {
                                 rels.add(new RelationshipJson(pQn, progId + "." + target,
                                         "CALLS", relPath, null, Map.of("type", "perform")));
                             }
-                        } else if (stmt instanceof io.proleap.cobol.asg.metamodel.procedure.call.CallStatement call) {
+                        } else if (stmt instanceof CallStatement call) {
                             String callee = callTarget(call);
                             if (callee != null) {
+                                // CALL is modelled as a program-level dependency (source = program),
+                                // not the issuing paragraph, per the design spec's program->program rule.
                                 rels.add(new RelationshipJson(progId, callee, "CALLS",
                                         relPath, null, Map.of("type", "call")));
                             }
@@ -116,14 +125,14 @@ public class CobolWalker {
     }
 
     private static int lineCount(File f) {
-        try (var lines = java.nio.file.Files.lines(f.toPath())) {
+        try (var lines = Files.lines(f.toPath())) {
             return (int) lines.count();
         } catch (Exception e) {
             return 0;
         }
     }
 
-    private static String callTarget(io.proleap.cobol.asg.metamodel.procedure.call.CallStatement call) {
+    private static String callTarget(CallStatement call) {
         var vs = call.getProgramValueStmt();
         if (vs == null || vs.getValue() == null) return null;
         String name = vs.getValue().toString().replace("'", "").replace("\"", "").trim();
@@ -133,11 +142,16 @@ public class CobolWalker {
     private void addCopyEdges(File file, String progId, String relPath,
                               List<EntityJson> entities, List<RelationshipJson> rels) {
         try {
-            java.util.Set<String> seen = new java.util.HashSet<>();
-            java.util.regex.Pattern pat =
-                java.util.regex.Pattern.compile("(?i)\\bCOPY\\s+([A-Z0-9][A-Z0-9-]*)");
-            for (String line : java.nio.file.Files.readAllLines(file.toPath())) {
-                java.util.regex.Matcher m = pat.matcher(line);
+            Set<String> seen = new HashSet<>();
+            Pattern pat =
+                Pattern.compile("(?i)\\bCOPY\\s+([A-Z0-9][A-Z0-9-]*)");
+            for (String line : Files.readAllLines(file.toPath(), StandardCharsets.ISO_8859_1)) {
+                // Fixed-format: a '*' or '/' in column 7 (index 6) marks a full-line comment.
+                if (format == CobolSourceFormatEnum.FIXED && line.length() > 6
+                        && (line.charAt(6) == '*' || line.charAt(6) == '/')) {
+                    continue;
+                }
+                Matcher m = pat.matcher(line);
                 if (m.find()) {
                     String name = m.group(1).toUpperCase();
                     if (seen.add(name)) {

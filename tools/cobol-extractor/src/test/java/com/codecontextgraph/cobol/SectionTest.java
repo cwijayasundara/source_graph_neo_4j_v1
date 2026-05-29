@@ -35,4 +35,15 @@ class SectionTest {
             && rel.sourceQname().equals("WITHSEC.A-SECTION")
             && rel.targetQname().equals("WITHSEC.A-PARA")));
     }
+
+    @Test
+    void allSectionParagraphsReparented() {
+        FileResultJson r = walk();
+        assertTrue(r.relationships().stream().anyMatch(rel ->
+            rel.kind().equals("CONTAINS") && rel.sourceQname().equals("WITHSEC.A-SECTION")
+            && rel.targetQname().equals("WITHSEC.B-PARA")));
+        assertTrue(r.relationships().stream().anyMatch(rel ->
+            rel.kind().equals("CONTAINS") && rel.sourceQname().equals("WITHSEC.C-SECTION")
+            && rel.targetQname().equals("WITHSEC.C-PARA")));
+    }
 }

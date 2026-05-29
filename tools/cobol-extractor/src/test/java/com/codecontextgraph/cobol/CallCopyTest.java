@@ -33,6 +33,16 @@ class CallCopyTest {
     }
 
     @Test
+    void commentedCopyIsSkipped() {
+        FileResultJson r = new CobolWalker("FIXED", List.of(
+            new File("src/test/resources/cobol/copybooks")))
+            .walk(new File("src/test/resources/cobol/copycomment.cbl"), "copycomment.cbl");
+        assertEquals("ok", r.parseStatus());
+        assertTrue(r.entities().stream().anyMatch(e -> e.qualifiedName().equals("CUSTREC")));
+        assertFalse(r.entities().stream().anyMatch(e -> e.qualifiedName().equals("SHOULDSKIP")));
+    }
+
+    @Test
     void unresolvedCallProducesExternalStub() {
         FileResultJson r = new CobolWalker("FIXED", List.of())
             .walk(new File("src/test/resources/cobol/caller.cbl"), "caller.cbl");
