@@ -17,6 +17,7 @@ class EntityKind(str, Enum):
     ENUM_MEMBER = "EnumMember"
     IMPORT = "Import"
     DECORATOR = "Decorator"
+    # COBOL (shared graph vocabulary; see code_context_graph/cobol/)
     PROGRAM = "Program"
     SECTION = "Section"
     PARAGRAPH = "Paragraph"

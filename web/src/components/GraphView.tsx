@@ -244,6 +244,7 @@ export function GraphView({ repo, onNodeClick }: Props) {
               Constant: 2,
               GlobalVar: 2,
               External: 2,
+              // COBOL kinds
               Program: 8,
               Section: 5,
               Paragraph: 3,
