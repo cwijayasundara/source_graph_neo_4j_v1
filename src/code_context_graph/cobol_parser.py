@@ -3,8 +3,10 @@ The JSON contract is the only coupling surface with the Java extractor.
 (The subprocess driver that produces this JSON is added in a later task.)"""
 from __future__ import annotations
 
+import json
 import logging
 import os
+import subprocess
 from pathlib import Path
 
 from code_context_graph.models import (
@@ -121,3 +123,31 @@ class CobolParser:
             if f.get("parseStatus") == "error":
                 logger.warning("COBOL parse error in %s: %s", f.get("filePath"), f.get("error"))
         return results
+
+    def _run_extractor(self) -> dict:
+        cmd = [
+            "java", "-jar", str(self.jar_path),
+            "--source-dir", str(self.repo_root),
+            "--format", self.source_format,
+            "--out", "-",
+        ]
+        for d in self.copybook_dirs:
+            cmd += ["--copybook-dir", d]
+        try:
+            proc = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=self.timeout, check=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError(
+                f"COBOL extractor failed (exit {exc.returncode}): {exc.stderr.strip()}"
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            stderr = (exc.stderr or "").strip()
+            msg = f"COBOL extractor timed out after {self.timeout}s"
+            if stderr:
+                msg += f": {stderr[:200]}"
+            raise RuntimeError(msg) from exc
+        try:
+            return json.loads(proc.stdout)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"COBOL extractor produced invalid JSON: {exc}") from exc
