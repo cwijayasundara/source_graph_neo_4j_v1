@@ -49,7 +49,7 @@ export default function RepoPage() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center gap-4">
+        <div className="w-full px-6 py-4 flex items-center gap-4">
           <Link href="/" className="text-zinc-400 hover:text-zinc-200 transition">
             <ArrowLeft className="w-5 h-5" />
           </Link>
@@ -75,9 +75,9 @@ export default function RepoPage() {
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
+      <main className="w-full px-6 py-6 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 space-y-4">
             <SearchBar onSelect={handleSearchSelect} />
             <GraphView repo={slug} onNodeClick={handleNodeClick} />
           </div>
