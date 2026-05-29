@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileText } from "lucide-react";
 
 type AttemptRecord = {
@@ -47,6 +47,10 @@ export default function BRDPanel({ repoId }: { repoId: string }) {
   const [latest, setLatest] = useState<LatestState>(null);
   const [loading, setLoading] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  // Synchronous guard against double-submit: state updates lag a render, so two
+  // clicks in the same tick would both POST and the second would 409. A ref flips
+  // immediately and blocks the duplicate.
+  const inFlight = useRef(false);
 
   const fetchLatest = async () => {
     const res = await fetch(`/api/repos/${encodeURIComponent(repoId)}/brd`);
@@ -71,14 +75,29 @@ export default function BRDPanel({ repoId }: { repoId: string }) {
   }, [latest]);
 
   const onGenerate = async () => {
+    // Block if a request is already in flight or a generation is already running.
+    if (inFlight.current || (isJobStatus(latest) && latest.status === "running")) return;
+    inFlight.current = true;
     setLoading(true);
-    await fetch(`/api/repos/${encodeURIComponent(repoId)}/brd`, { method: "POST" });
-    await fetchLatest();
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/repos/${encodeURIComponent(repoId)}/brd`, {
+        method: "POST",
+      });
+      // 409 means a generation is already running for this repo — not an error;
+      // fetchLatest() below will reflect the "running" status and start polling.
+      if (!res.ok && res.status !== 409) {
+        console.error(`BRD generation request failed (${res.status})`);
+      }
+      await fetchLatest();
+    } finally {
+      setLoading(false);
+      inFlight.current = false;
+    }
   };
 
   const summary = !isJobStatus(latest) ? (latest as BRDSummary | null) : null;
   const job = isJobStatus(latest) ? latest : null;
+  const busy = loading || job?.status === "running";
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5">
@@ -91,10 +110,10 @@ export default function BRDPanel({ repoId }: { repoId: string }) {
         </div>
         <button
           onClick={onGenerate}
-          disabled={loading || (job?.status === "running")}
+          disabled={busy}
           className="px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
-          {summary ? "Re-generate" : "Generate BRD"}
+          {busy ? "Generating…" : summary ? "Re-generate" : "Generate BRD"}
         </button>
       </div>
 
