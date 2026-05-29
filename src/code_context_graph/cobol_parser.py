@@ -76,12 +76,14 @@ class CobolParser:
         jar_path: str | None,
         copybook_dirs: tuple[str, ...] = (),
         source_format: str = "FIXED",
+        java_home: str | None = None,
         timeout: int = 600,
     ) -> None:
         self.repo_root = Path(repo_root)
         self.jar_path = jar_path
         self.copybook_dirs = copybook_dirs
         self.source_format = source_format
+        self.java_home = java_home
         self.timeout = timeout
 
     @classmethod
@@ -93,7 +95,28 @@ class CobolParser:
             jar_path=os.getenv("CCG_COBOL_EXTRACTOR_JAR"),
             copybook_dirs=copybook_dirs,
             source_format=os.getenv("CCG_COBOL_FORMAT", "FIXED"),
+            java_home=os.getenv("JAVA_HOME"),
         )
+
+    def _java_executable(self) -> str:
+        """Resolve the java binary: prefer ``$JAVA_HOME/bin/java`` (so JAVA_HOME can
+        be set in .env without putting Java on PATH), else fall back to ``java``."""
+        if self.java_home:
+            candidate = Path(self.java_home) / "bin" / "java"
+            if candidate.exists():
+                return str(candidate)
+        return "java"
+
+    @staticmethod
+    def _java_works(java: str) -> bool:
+        """True only if the java binary can actually run (handles macOS's stub
+        ``/usr/bin/java`` that exists even with no JDK installed)."""
+        try:
+            return subprocess.run(
+                [java, "-version"], capture_output=True, timeout=30
+            ).returncode == 0
+        except Exception:
+            return False
 
     def discover_files(self) -> list[Path]:
         out: list[Path] = []
@@ -117,16 +140,24 @@ class CobolParser:
                 len(files), self.jar_path,
             )
             return []
-        payload = self._run_extractor()
+        java = self._java_executable()
+        if not self._java_works(java):
+            logger.warning(
+                "Found %d COBOL file(s) but no working Java runtime "
+                "(JAVA_HOME=%r, resolved java=%r). Skipping COBOL.",
+                len(files), self.java_home, java,
+            )
+            return []
+        payload = self._run_extractor(java)
         results = cobol_json_to_parse_results(payload)
         for f in payload.get("files", []):
             if f.get("parseStatus") == "error":
                 logger.warning("COBOL parse error in %s: %s", f.get("filePath"), f.get("error"))
         return results
 
-    def _run_extractor(self) -> dict:
+    def _run_extractor(self, java: str = "java") -> dict:
         cmd = [
-            "java", "-jar", str(self.jar_path),
+            java, "-jar", str(self.jar_path),
             "--source-dir", str(self.repo_root),
             "--format", self.source_format,
             "--out", "-",
@@ -137,6 +168,8 @@ class CobolParser:
             proc = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=self.timeout, check=True,
             )
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"Java executable not found: {java}") from exc
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(
                 f"COBOL extractor failed (exit {exc.returncode}): {exc.stderr.strip()}"
