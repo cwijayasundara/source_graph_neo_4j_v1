@@ -1,0 +1,5 @@
+package com.codecontextgraph.cobol.json;
+
+import java.util.List;
+
+public record ExtractionJson(int schemaVersion, List<FileResultJson> files) {}

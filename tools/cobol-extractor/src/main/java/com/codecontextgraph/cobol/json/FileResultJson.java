@@ -1,0 +1,7 @@
+package com.codecontextgraph.cobol.json;
+
+import java.util.List;
+
+public record FileResultJson(
+    String filePath, String parseStatus, String error,
+    List<EntityJson> entities, List<RelationshipJson> relationships) {}
