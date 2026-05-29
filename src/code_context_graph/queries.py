@@ -198,6 +198,25 @@ class CodeGraphQueries:
             search_term=query,
         )
 
+    def suggest_entities(self, prefix: str, repo: str | None = None, limit: int = 10) -> list[dict]:
+        """Entity-name suggestions for typeahead: case-insensitive prefix match on
+        simple or qualified name, optionally scoped to a repo. Shortest qualified
+        names first."""
+        return self.client.run(
+            f"""
+            MATCH (e:CodeEntity)
+            WHERE (toLower(e.simple_name) STARTS WITH toLower($prefix)
+                   OR toLower(e.qualified_name) STARTS WITH toLower($prefix))
+              {self._repo_filter("e", repo)}
+            RETURN e.qualified_name AS qualified_name,
+                   e.simple_name AS simple_name,
+                   e.kind AS kind
+            ORDER BY size(e.qualified_name), e.qualified_name
+            LIMIT $limit
+            """,
+            **self._params(repo, prefix=prefix, limit=limit),
+        )
+
     def graph_stats(self) -> dict:
         """Summary statistics of the code graph."""
         counts = self.client.run(
