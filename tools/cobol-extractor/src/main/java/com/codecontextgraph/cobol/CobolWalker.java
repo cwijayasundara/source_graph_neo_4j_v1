@@ -12,6 +12,7 @@ import io.proleap.cobol.asg.metamodel.procedure.ProcedureDivision;
 import io.proleap.cobol.asg.metamodel.procedure.Statement;
 import io.proleap.cobol.asg.metamodel.procedure.perform.PerformProcedureStatement;
 import io.proleap.cobol.asg.metamodel.procedure.perform.PerformStatement;
+import io.proleap.cobol.asg.metamodel.procedure.Section;
 import io.proleap.cobol.asg.params.CobolParserParams;
 import io.proleap.cobol.asg.params.impl.CobolParserParamsImpl;
 import io.proleap.cobol.asg.runner.impl.CobolParserRunnerImpl;
@@ -54,13 +55,25 @@ public class CobolWalker {
 
                 ProcedureDivision pd = pu.getProcedureDivision();
                 if (pd == null) continue;
+                for (Section section : pd.getSections()) {
+                    if (section.getName() == null) continue;
+                    String sName = section.getName().toUpperCase();
+                    String sQn = progId + "." + sName;
+                    entities.add(new EntityJson("Section", sQn, sName, relPath, 0, 0, false));
+                    rels.add(new RelationshipJson(progId, sQn, "CONTAINS", relPath, null, Map.of()));
+                }
                 for (Paragraph para : pd.getParagraphs()) {
                     if (para.getName() == null) continue;
                     String pName = para.getName().toUpperCase();
                     String pQn = progId + "." + pName;
                     // TODO(v2): populate real paragraph line numbers from ProLeap ctx
                     entities.add(new EntityJson("Paragraph", pQn, pName, relPath, 0, 0, false));
-                    rels.add(new RelationshipJson(progId, pQn, "CONTAINS", relPath, null, Map.of()));
+                    String container = progId;
+                    Section paraSection = para.getSection();
+                    if (paraSection != null && paraSection.getName() != null) {
+                        container = progId + "." + paraSection.getName().toUpperCase();
+                    }
+                    rels.add(new RelationshipJson(container, pQn, "CONTAINS", relPath, null, Map.of()));
 
                     for (Statement stmt : para.getStatements()) {
                         if (stmt instanceof PerformStatement perform) {
