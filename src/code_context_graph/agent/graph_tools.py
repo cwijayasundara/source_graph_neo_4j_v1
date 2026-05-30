@@ -66,9 +66,10 @@ def _make_handlers(deps: GraphDeps) -> dict[str, Callable[[dict], Awaitable[dict
     }
 
 
-def build_graph_server(deps: GraphDeps):
+def build_graph_server(deps: GraphDeps, *, advisor=None, advisor_max_uses: int = 3):
     """Build the in-process MCP server exposing graph navigation tools, all bound to
-    this repo's GraphDeps. All tools are read-only."""
+    this repo's GraphDeps. All tools are read-only. If `advisor` (an AdvisorBackend)
+    is given, a consult_advisor tool is added with a shared per-server use budget."""
     h = _make_handlers(deps)
 
     tools = [
@@ -103,4 +104,7 @@ def build_graph_server(deps: GraphDeps):
         tool("graph_summary", "Entity and relationship counts for the repo.",
              {}, annotations=_READ_ONLY)(h["graph_summary"]),
     ]
+    if advisor is not None:
+        from code_context_graph.agent.advisor import build_advisor_tool
+        tools.append(build_advisor_tool(advisor, advisor_max_uses))
     return create_sdk_mcp_server(name=SERVER_NAME, version="1.0.0", tools=tools)
