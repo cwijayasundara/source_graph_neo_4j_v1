@@ -74,6 +74,42 @@ async def test_reduce_failure_degrades_to_deterministic_merge(seeded, tmp_path, 
 
 
 @pytest.mark.asyncio
+async def test_advisor_offered_to_map_workers_when_enabled(seeded, tmp_path, fake_runner):
+    from code_context_graph.agent.advisor import ADVISOR_TOOL_NAME
+
+    class FakeAdvisor:
+        async def advise(self, question, context):
+            return "advice"
+
+    seeded.when(lambda q, p: "RETURN e.qualified_name AS qn" in q, [{"qn": "a"}])
+    seeded.when(lambda q, p: "RETURN a.qualified_name AS src" in q, [])
+    deps = GraphDeps(client=seeded, repo_id="r", repo_path=tmp_path)
+    fake_runner.script(
+        {"sections": [{"title": "Executive Summary", "body_markdown": "x",
+                       "requirements": []}], "evidence_map": {}},
+    )
+    await agenerate_brd_draft(deps, runner=fake_runner, model="m", max_turns=5,
+                              max_subsystems=12, advisor=FakeAdvisor(), advisor_max_uses=2)
+    assert ADVISOR_TOOL_NAME in fake_runner.calls[0]["allowed_tools"]
+
+
+@pytest.mark.asyncio
+async def test_no_advisor_tool_when_disabled(seeded, tmp_path, fake_runner):
+    from code_context_graph.agent.advisor import ADVISOR_TOOL_NAME
+
+    seeded.when(lambda q, p: "RETURN e.qualified_name AS qn" in q, [{"qn": "a"}])
+    seeded.when(lambda q, p: "RETURN a.qualified_name AS src" in q, [])
+    deps = GraphDeps(client=seeded, repo_id="r", repo_path=tmp_path)
+    fake_runner.script(
+        {"sections": [{"title": "Executive Summary", "body_markdown": "x",
+                       "requirements": []}], "evidence_map": {}},
+    )
+    await agenerate_brd_draft(deps, runner=fake_runner, model="m", max_turns=5,
+                              max_subsystems=12)  # advisor defaults to None
+    assert ADVISOR_TOOL_NAME not in fake_runner.calls[0]["allowed_tools"]
+
+
+@pytest.mark.asyncio
 async def test_failed_subsystem_degrades_to_stub(seeded, tmp_path, fake_runner):
     seeded.when(lambda q, p: "RETURN e.qualified_name AS qn" in q,
                 [{"qn": "a"}, {"qn": "b"}])

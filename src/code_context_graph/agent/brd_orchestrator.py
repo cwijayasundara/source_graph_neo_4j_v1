@@ -4,6 +4,7 @@ import asyncio
 import json
 
 from code_context_graph.agent import graph_ops as ops
+from code_context_graph.agent.advisor import ADVISOR_TOOL_NAME
 from code_context_graph.agent.brd_schema import BRDDraft, brd_draft_schema
 from code_context_graph.agent.deps import GraphDeps
 from code_context_graph.agent.graph_tools import GRAPH_TOOL_NAMES, build_graph_server
@@ -82,11 +83,11 @@ def _merge_drafts_fallback(drafts: list[BRDDraft]) -> BRDDraft:
     return BRDDraft(sections=list(by_title.values()), evidence_map=evidence)
 
 
-async def _map_one(deps, runner, server, model, max_turns, sub) -> BRDDraft:
+async def _map_one(deps, runner, server, allowed_tools, model, max_turns, sub) -> BRDDraft:
     try:
         raw = await runner.run_structured(
             system=MAP_SYSTEM, prompt=_map_prompt(sub["name"], sub["members"]),
-            server=server, allowed_tools=GRAPH_TOOL_NAMES, model=model,
+            server=server, allowed_tools=allowed_tools, model=model,
             max_turns=max_turns, schema=brd_draft_schema(),
         )
         return BRDDraft.model_validate(raw)
@@ -95,15 +96,17 @@ async def _map_one(deps, runner, server, model, max_turns, sub) -> BRDDraft:
 
 
 async def agenerate_brd_draft(deps: GraphDeps, *, runner: AgentRunner, model: str,
-                              max_turns: int, max_subsystems: int
+                              max_turns: int, max_subsystems: int,
+                              advisor=None, advisor_max_uses: int = 3
                               ) -> tuple[BRDDraft, Strategy]:
-    server = build_graph_server(deps)
+    server = build_graph_server(deps, advisor=advisor, advisor_max_uses=advisor_max_uses)
+    map_tools = list(GRAPH_TOOL_NAMES) + ([ADVISOR_TOOL_NAME] if advisor is not None else [])
     subs = ops.list_subsystems(deps, max_clusters=max_subsystems)["subsystems"]
     if not subs:
         subs = [{"name": deps.repo_id, "members": []}]
 
     drafts = await asyncio.gather(*[
-        _map_one(deps, runner, server, model, max_turns, s) for s in subs
+        _map_one(deps, runner, server, map_tools, model, max_turns, s) for s in subs
     ])
 
     if len(drafts) == 1:

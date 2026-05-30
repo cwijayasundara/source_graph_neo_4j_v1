@@ -60,7 +60,7 @@ class FakeAgentRunner(AgentRunner):
     async def run_structured(self, *, system, prompt, server, allowed_tools,
                              model, max_turns, schema):
         self.calls.append({"system": system, "prompt": prompt, "model": model,
-                           "max_turns": max_turns})
+                           "max_turns": max_turns, "allowed_tools": allowed_tools})
         return self._scripted.pop(0) if self._scripted else {}
 
 

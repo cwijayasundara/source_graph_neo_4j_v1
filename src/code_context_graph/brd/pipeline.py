@@ -37,7 +37,8 @@ def _draft_to_brd(draft, repo_id: str, model: str, strategy: Strategy) -> BRD:
 
 async def agenerate_brd_graph(deps: GraphDeps, *, runner: AgentRunner, model: str,
                               max_retries: int, max_turns: int,
-                              max_subsystems: int) -> GraphBRDResult:
+                              max_subsystems: int,
+                              advisor=None, advisor_max_uses: int = 3) -> GraphBRDResult:
     from code_context_graph.agent.brd_judge import ajudge
     from code_context_graph.agent.brd_orchestrator import agenerate_brd_draft
 
@@ -47,7 +48,8 @@ async def agenerate_brd_graph(deps: GraphDeps, *, runner: AgentRunner, model: st
     for attempt_no in range(1, max_retries + 2):
         draft, strategy = await agenerate_brd_draft(
             deps, runner=runner, model=model, max_turns=max_turns,
-            max_subsystems=max_subsystems)
+            max_subsystems=max_subsystems, advisor=advisor,
+            advisor_max_uses=advisor_max_uses)
         brd = _draft_to_brd(draft, deps.repo_id, model, strategy)
         report = await ajudge(brd, deps, runner=runner, model=model)
         attempts.append(AttemptRecord(attempt=attempt_no, rating=report.rating,
@@ -93,9 +95,15 @@ def generate_brd_graph_sync(repo_id: str, *, client=None, repo_path=None,
     from code_context_graph.agent.harness import SdkAgentRunner
     deps = GraphDeps(client=client, repo_id=repo_id, repo_path=Path(repo_path))
     runner = SdkAgentRunner()
+    advisor = None
+    advisor_max_uses = int(os.getenv("ADVISOR_MAX_USES", "3"))
+    if os.getenv("BRD_ADVISOR_ENABLED", "").lower() in ("1", "true", "yes"):
+        from code_context_graph.agent.advisor import AnthropicAdvisor
+        advisor = AnthropicAdvisor()
     result = asyncio.run(agenerate_brd_graph(
         deps, runner=runner, model=model, max_retries=max_retries,
-        max_turns=max_turns, max_subsystems=max_subsystems))
+        max_turns=max_turns, max_subsystems=max_subsystems,
+        advisor=advisor, advisor_max_uses=advisor_max_uses))
 
     html = render_html(result.brd)
     if storage is None:
