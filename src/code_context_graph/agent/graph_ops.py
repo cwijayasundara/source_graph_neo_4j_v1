@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from code_context_graph.agent.deps import GraphDeps
+from code_context_graph.agent.clustering import detect_subsystems
 
 # Whitelist: edges and directions an agent may traverse. Anything else is rejected
 # so a tool call can never smuggle arbitrary Cypher fragments into a query.
@@ -175,3 +176,21 @@ def known_refs(deps: GraphDeps) -> set[str]:
         if r.get("file_path"):
             refs.add(r["file_path"])
     return refs
+
+
+def list_subsystems(deps: GraphDeps, *, max_clusters: int = 12) -> dict[str, Any]:
+    node_rows = deps.client.run(
+        "MATCH (e:CodeEntity {repo: $repo}) RETURN e.qualified_name AS qn",
+        repo=deps.repo_id,
+    )
+    edge_rows = deps.client.run(
+        """
+        MATCH (a:CodeEntity {repo: $repo})-[:CALLS|IMPORTS|CONTAINS]->(b:CodeEntity {repo: $repo})
+        RETURN a.qualified_name AS src, b.qualified_name AS dst
+        """,
+        repo=deps.repo_id,
+    )
+    nodes = [r["qn"] for r in node_rows if r.get("qn")]
+    edges = [(r["src"], r["dst"]) for r in edge_rows if r.get("src") and r.get("dst")]
+    subs = detect_subsystems(nodes, edges, max_clusters=max_clusters)
+    return {"subsystems": [{"name": s.name, "members": s.members} for s in subs]}
