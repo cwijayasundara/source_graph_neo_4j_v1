@@ -41,3 +41,29 @@ def repo_tree(tmp_path: Path) -> Path:
     f.parent.mkdir(parents=True)
     f.write_text("line1\nline2\nline3\nline4\nline5\n")
     return tmp_path
+
+
+from code_context_graph.agent.harness import AgentRunner  # noqa: E402
+
+
+class FakeAgentRunner(AgentRunner):
+    """Returns scripted structured outputs without touching the SDK/network."""
+
+    def __init__(self) -> None:
+        self._scripted: list[dict] = []
+        self.calls: list[dict] = []
+        self.token_usage = {"input": 0, "output": 0}
+
+    def script(self, *outputs: dict) -> None:
+        self._scripted = list(outputs)
+
+    async def run_structured(self, *, system, prompt, server, allowed_tools,
+                             model, max_turns, schema):
+        self.calls.append({"system": system, "prompt": prompt, "model": model,
+                           "max_turns": max_turns})
+        return self._scripted.pop(0) if self._scripted else {}
+
+
+@pytest.fixture
+def fake_runner() -> "FakeAgentRunner":
+    return FakeAgentRunner()
