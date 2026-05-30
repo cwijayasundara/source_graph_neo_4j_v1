@@ -102,21 +102,19 @@ def _build_reduce_message(sub_brds: list[BRD], revision_guidance: str | None) ->
 
 
 def _resolve_model() -> str:
-    """Pick the BRD model id, appending the 1M-context suffix only if not already present."""
-    base = os.getenv("BRD_MODEL", "claude-opus-4-7")
-    return base if "[" in base else f"{base}[1m]"
+    return os.getenv("BRD_MODEL", "gemini-3.5-flash")
 
 
 class Generator:
-    def __init__(self, anthropic, model: str | None = None,
+    def __init__(self, llm, model: str | None = None,
                  max_tokens: int = 16_000) -> None:
-        self.anthropic = anthropic
+        self.llm = llm
         self.model = model or _resolve_model()
         self.max_tokens = max_tokens
         self.token_usage = {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0}
 
     def _call(self, user_message: str, *, system: str = SYSTEM_PROMPT) -> str:
-        response = self.anthropic.messages.create(
+        response = self.llm.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
             system=system,

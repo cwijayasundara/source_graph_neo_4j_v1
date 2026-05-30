@@ -53,6 +53,7 @@ def clone(
         ingester = CodeGraphIngester(client, local_path)
         stats = ingester.ingest(clear=False, with_git=True)
         mgr.tag_entities(slug)
+        mgr.link_files_to_modules(slug)
         mgr.register(slug, url, str(local_path), stats)
         console.print(f"[green]Registered repo: {slug}[/green]")
 

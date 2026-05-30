@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
+from code_context_graph import schema
 from code_context_graph.neo4j_client import Neo4jClient
 
 
@@ -13,9 +14,9 @@ class RepoManager:
         self.client = client
 
     def ensure_constraints(self) -> None:
-        self.client.run(
-            "CREATE CONSTRAINT repo_slug IF NOT EXISTS FOR (r:Repository) REQUIRE r.slug IS UNIQUE"
-        )
+        # Kept for backwards compatibility; the canonical constraint definitions
+        # live in schema.CONSTRAINTS and are applied via Neo4jClient.apply_schema.
+        self.client.apply_schema()
 
     def register(
         self,
@@ -58,6 +59,12 @@ class RepoManager:
         )
         return result[0]["tagged"] if result else 0
 
+    def link_files_to_modules(self, slug: str) -> int:
+        """Create one :File node per distinct file_path in the repo and link
+        every :Module CodeEntity to it via [:DEFINED_IN]. Returns file count."""
+        rows = self.client.run(schema.LINK_FILES_FOR_REPO, slug=slug)
+        return rows[0]["file_count"] if rows else 0
+
     @staticmethod
     def _normalize_repo(props: dict) -> dict:
         return {
@@ -96,6 +103,7 @@ class RepoManager:
             "MATCH (e:CodeEntity {repo: $slug}) DETACH DELETE e",
             slug=slug,
         )
+        self.client.run(schema.DELETE_FILES_FOR_REPO, slug=slug)
         self.client.run(
             "MATCH (r:Repository {slug: $slug}) DETACH DELETE r",
             slug=slug,

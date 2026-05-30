@@ -12,6 +12,11 @@ node_modules/
 .next/
 source_code_to_analyse/cwijayasundara/neo_4j_context_graphs_v1.0/
 
+# Generated BRD output and TS build cache
+brd_output/
+web/brd_output/
+web/tsconfig.tsbuildinfo
+
 # COBOL extractor (Java) build output
 tools/cobol-extractor/target/
 tools/cobol-extractor/dependency-reduced-pom.xml

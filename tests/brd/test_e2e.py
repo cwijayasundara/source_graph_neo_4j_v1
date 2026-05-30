@@ -15,7 +15,7 @@ CASSETTE = Path(__file__).parent / "cassettes" / "sample_repo_run.json"
 
 
 class _Cassette:
-    """Alternating fake anthropic — odd calls return generator responses, even return judge."""
+    """Alternating fake LLM — odd calls return generator responses, even return judge."""
 
     def __init__(self, payload: dict) -> None:
         self._gen = list(payload["generator_responses"])
@@ -48,8 +48,8 @@ def test_end_to_end_with_cassette(fake_client, tmp_path):
         files=[("src/code_context_graph/parser.py", "x = 1")],
         strategy="single_shot", clusters=None, estimated_tokens=10,
     )
-    gen = Generator(anthropic=cassette, model="claude-opus-4-7[1m]")
-    judge = Judge(anthropic=cassette, model="claude-opus-4-7[1m]")
+    gen = Generator(llm=cassette, model="gemini-3.5-flash")
+    judge = Judge(llm=cassette, model="gemini-3.5-flash")
 
     # Storage: tmp_path so we don't write into the repo
     storage = BRDStorage(fake_client, output_dir=tmp_path)

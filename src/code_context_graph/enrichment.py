@@ -31,7 +31,7 @@ Return ONLY valid JSON, no markdown fences.
 class SemanticEnricher:
     """Use an LLM to tag code entities with design patterns, architectural layers, and concepts."""
 
-    def __init__(self, client: Neo4jClient, model: str = "claude-haiku-4-5") -> None:
+    def __init__(self, client: Neo4jClient, model: str = "gemini-3.5-flash") -> None:
         self.client = client
         self.model = model
 
@@ -56,12 +56,9 @@ class SemanticEnricher:
         if not entities:
             return 0
 
-        try:
-            from anthropic import Anthropic
-        except ImportError:
-            raise RuntimeError("Install anthropic (`pip install code-context-graph[llm]`) for enrichment")
+        from code_context_graph.gemini_llm import GeminiMessagesClient
 
-        anthropic = Anthropic()
+        llm = GeminiMessagesClient()
         enriched = 0
 
         for entity in entities:
@@ -75,7 +72,7 @@ class SemanticEnricher:
                 decorators=entity.get("decorators") or "N/A",
             )
 
-            response = anthropic.messages.create(
+            response = llm.messages.create(
                 model=self.model,
                 max_tokens=500,
                 messages=[{"role": "user", "content": prompt}],

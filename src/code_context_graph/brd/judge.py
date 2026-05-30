@@ -64,8 +64,7 @@ Return ONLY JSON, no markdown fences:
 
 
 def _resolve_model() -> str:
-    base = os.getenv("BRD_MODEL", "claude-opus-4-7")
-    return base if "[" in base else f"{base}[1m]"
+    return os.getenv("BRD_MODEL", "gemini-3.5-flash")
 
 
 def _rate(weighted: float, dims: dict[Dimension, DimensionScore]) -> Rating:
@@ -77,9 +76,9 @@ def _rate(weighted: float, dims: dict[Dimension, DimensionScore]) -> Rating:
 
 
 class Judge:
-    def __init__(self, anthropic, model: str | None = None,
+    def __init__(self, llm, model: str | None = None,
                  max_tokens: int = 4000) -> None:
-        self.anthropic = anthropic
+        self.llm = llm
         self.model = model or _resolve_model()
         self.max_tokens = max_tokens
 
@@ -88,7 +87,7 @@ class Judge:
             "## Context (graph summary)\n" + ctx.summary_text +
             "\n\n## BRD under review\n```json\n" + brd.model_dump_json() + "\n```"
         )
-        response = self.anthropic.messages.create(
+        response = self.llm.messages.create(
             model=self.model, max_tokens=self.max_tokens,
             system=JUDGE_SYSTEM,
             messages=[{"role": "user", "content": user}],

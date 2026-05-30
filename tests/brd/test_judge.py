@@ -53,38 +53,38 @@ def _judge_payload(c=5, a=5, cl=5, co=5, ac=5, feedback=None):
     })
 
 
-def test_judge_high_rating(fake_anthropic):
-    fake_anthropic.script(_judge_payload(5, 5, 4, 4, 4))
+def test_judge_high_rating(fake_llm):
+    fake_llm.script(_judge_payload(5, 5, 4, 4, 4))
     from code_context_graph.brd.judge import Judge
-    j = Judge(anthropic=fake_anthropic, model="claude-opus-4-7[1m]")
+    j = Judge(llm=fake_llm, model="gemini-3.5-flash")
     report = j.evaluate(_brd_with_evidence({"FR-1": ["src/a.py:foo"]}),
                         _ctx_with_entities(["src/a.py:foo"]))
     assert report.rating == Rating.high
     assert abs(report.weighted_score - (5*0.25 + 5*0.30 + 4*0.15 + 4*0.15 + 4*0.15)) < 0.001
 
 
-def test_judge_medium_rating(fake_anthropic):
-    fake_anthropic.script(_judge_payload(4, 3, 3, 3, 3))
+def test_judge_medium_rating(fake_llm):
+    fake_llm.script(_judge_payload(4, 3, 3, 3, 3))
     from code_context_graph.brd.judge import Judge
-    j = Judge(anthropic=fake_anthropic, model="claude-opus-4-7[1m]")
+    j = Judge(llm=fake_llm, model="gemini-3.5-flash")
     report = j.evaluate(_brd_with_evidence({"FR-1": ["src/a.py:foo"]}),
                         _ctx_with_entities(["src/a.py:foo"]))
     assert report.rating == Rating.medium
 
 
-def test_judge_low_when_dimension_below_two(fake_anthropic):
-    fake_anthropic.script(_judge_payload(5, 5, 1, 5, 5))
+def test_judge_low_when_dimension_below_two(fake_llm):
+    fake_llm.script(_judge_payload(5, 5, 1, 5, 5))
     from code_context_graph.brd.judge import Judge
-    j = Judge(anthropic=fake_anthropic, model="claude-opus-4-7[1m]")
+    j = Judge(llm=fake_llm, model="gemini-3.5-flash")
     report = j.evaluate(_brd_with_evidence({"FR-1": ["src/a.py:foo"]}),
                         _ctx_with_entities(["src/a.py:foo"]))
     assert report.rating == Rating.low
 
 
-def test_groundedness_failure_forces_accuracy_le_two(fake_anthropic):
-    fake_anthropic.script(_judge_payload(5, 5, 5, 5, 5))
+def test_groundedness_failure_forces_accuracy_le_two(fake_llm):
+    fake_llm.script(_judge_payload(5, 5, 5, 5, 5))
     from code_context_graph.brd.judge import Judge
-    j = Judge(anthropic=fake_anthropic, model="claude-opus-4-7[1m]")
+    j = Judge(llm=fake_llm, model="gemini-3.5-flash")
     brd = _brd_with_evidence({"FR-1": ["src/ghost.py:nope"]})
     report = j.evaluate(brd, _ctx_with_entities(["src/a.py:foo"]))
     assert report.dimensions[Dimension.accuracy].score <= 2

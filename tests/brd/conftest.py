@@ -27,8 +27,13 @@ def fake_client() -> FakeNeo4jClient:
     return FakeNeo4jClient()
 
 
-class FakeAnthropic:
-    """Records messages.create() calls and returns scripted text responses."""
+class FakeLLM:
+    """Records messages.create() calls and returns scripted text responses.
+
+    Matches the GeminiMessagesClient surface (and the Anthropic SDK surface it
+    was modelled on): ``.messages.create(...)`` returning an object with
+    ``content[0].text`` and a ``usage`` namespace.
+    """
 
     def __init__(self) -> None:
         self.calls: list[dict] = []
@@ -57,5 +62,5 @@ class FakeAnthropic:
 
 
 @pytest.fixture
-def fake_anthropic() -> FakeAnthropic:
-    return FakeAnthropic()
+def fake_llm() -> FakeLLM:
+    return FakeLLM()

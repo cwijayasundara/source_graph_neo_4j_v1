@@ -60,11 +60,11 @@ def generate_brd(
                                 force_map_reduce=force_map_reduce)
 
     if generator is None:
-        from anthropic import Anthropic
-        generator = Generator(anthropic=Anthropic())
+        from code_context_graph.gemini_llm import GeminiMessagesClient
+        generator = Generator(llm=GeminiMessagesClient())
     if judge is None:
-        from anthropic import Anthropic
-        judge = Judge(anthropic=Anthropic())
+        from code_context_graph.gemini_llm import GeminiMessagesClient
+        judge = Judge(llm=GeminiMessagesClient())
     # Only auto-create storage in production mode (no pre-built context).
     if storage is None and not test_mode and client is not None:
         storage = BRDStorage(client)

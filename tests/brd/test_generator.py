@@ -28,9 +28,9 @@ def _scripted_brd_json() -> str:
     })
 
 
-def test_single_shot_returns_brd(fake_anthropic):
-    fake_anthropic.script(_scripted_brd_json())
-    gen = Generator(anthropic=fake_anthropic, model="claude-opus-4-7[1m]")
+def test_single_shot_returns_brd(fake_llm):
+    fake_llm.script(_scripted_brd_json())
+    gen = Generator(llm=fake_llm, model="gemini-3.5-flash")
     brd = gen.generate(_ctx())
     assert isinstance(brd, BRD)
     assert brd.strategy == Strategy.single_shot
@@ -38,11 +38,11 @@ def test_single_shot_returns_brd(fake_anthropic):
     assert brd.evidence_map["FR-1"] == ["src/a.py"]
 
 
-def test_single_shot_passes_revision_guidance(fake_anthropic):
-    fake_anthropic.script(_scripted_brd_json())
-    gen = Generator(anthropic=fake_anthropic, model="claude-opus-4-7[1m]")
+def test_single_shot_passes_revision_guidance(fake_llm):
+    fake_llm.script(_scripted_brd_json())
+    gen = Generator(llm=fake_llm, model="gemini-3.5-flash")
     gen.generate(_ctx(), revision_guidance="Address FR-2 missing.")
-    sent = fake_anthropic.calls[-1]
+    sent = fake_llm.calls[-1]
     # The user message should mention prior judge feedback
     user_text = sent["messages"][-1]["content"]
     assert "Address FR-2 missing." in user_text
@@ -60,14 +60,14 @@ def _scripted_sub_brd_json(cluster_id: str) -> str:
     })
 
 
-def test_map_reduce_runs_one_call_per_cluster_then_reduce(fake_anthropic):
+def test_map_reduce_runs_one_call_per_cluster_then_reduce(fake_llm):
     map_a = _scripted_sub_brd_json("a")
     map_b = _scripted_sub_brd_json("b")
     # reduce returns merged BRD
     reduce_out = _scripted_brd_json().replace(
         '"FR-1"', '"FR-a"'
     )
-    fake_anthropic.script(map_a, map_b, reduce_out)
+    fake_llm.script(map_a, map_b, reduce_out)
     ctx = PromptContext(
         repo_id="acme",
         summary_text="summary",
@@ -76,7 +76,7 @@ def test_map_reduce_runs_one_call_per_cluster_then_reduce(fake_anthropic):
         clusters=[["src/a/mod.py"], ["src/b/mod.py"]],
         estimated_tokens=10,
     )
-    gen = Generator(anthropic=fake_anthropic, model="claude-opus-4-7[1m]")
+    gen = Generator(llm=fake_llm, model="gemini-3.5-flash")
     brd = gen.generate(ctx)
     assert brd.strategy == Strategy.map_reduce
-    assert len(fake_anthropic.calls) == 3  # 2 maps + 1 reduce
+    assert len(fake_llm.calls) == 3  # 2 maps + 1 reduce

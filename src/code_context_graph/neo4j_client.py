@@ -22,7 +22,15 @@ class Neo4jClient:
         self.uri = uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
         self.user = user or os.getenv("NEO4J_USER", "neo4j")
         self.password = password or os.getenv("NEO4J_PASSWORD", "")
-        self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
+        # Suppress UNRECOGNIZED notifications: Neo4j warns whenever a query
+        # references a label/relationship/property the DB has not yet seen
+        # (e.g. HAS_BRD before the first BRD is written). They are cosmetic
+        # and spam the log on every poll until the first write happens.
+        self.driver = GraphDatabase.driver(
+            self.uri,
+            auth=(self.user, self.password),
+            notifications_disabled_classifications=["UNRECOGNIZED"],
+        )
 
     def close(self) -> None:
         self.driver.close()

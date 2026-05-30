@@ -131,6 +131,7 @@ def _ingest_repo(slug: str, url: str, local_path: Path) -> dict:
         raise HTTPException(500, f"Ingestion failed: {traceback.format_exc()}")
 
     mgr.tag_entities(slug)
+    mgr.link_files_to_modules(slug)
     repo_data = mgr.register(slug, url, str(local_path), stats)
     return {"status": "ok", "repo": repo_data, "stats": stats}
 

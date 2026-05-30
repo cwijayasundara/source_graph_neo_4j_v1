@@ -2,16 +2,20 @@ from __future__ import annotations
 
 CONSTRAINTS = [
     "CREATE CONSTRAINT entity_qname IF NOT EXISTS FOR (e:CodeEntity) REQUIRE e.qualified_name IS UNIQUE",
-    "CREATE CONSTRAINT file_path IF NOT EXISTS FOR (f:File) REQUIRE f.path IS UNIQUE",
+    "CREATE CONSTRAINT file_repo_path IF NOT EXISTS FOR (f:File) REQUIRE (f.repo, f.path) IS UNIQUE",
     "CREATE CONSTRAINT author_email IF NOT EXISTS FOR (a:Author) REQUIRE a.email IS UNIQUE",
     "CREATE CONSTRAINT brd_id IF NOT EXISTS FOR (b:BRD) REQUIRE b.id IS UNIQUE",
+    "CREATE CONSTRAINT repo_slug IF NOT EXISTS FOR (r:Repository) REQUIRE r.slug IS UNIQUE",
 ]
 
 INDEXES = [
     "CREATE INDEX entity_kind IF NOT EXISTS FOR (e:CodeEntity) ON (e.kind)",
     "CREATE INDEX entity_file IF NOT EXISTS FOR (e:CodeEntity) ON (e.file_path)",
     "CREATE INDEX entity_name IF NOT EXISTS FOR (e:CodeEntity) ON (e.simple_name)",
+    "CREATE INDEX entity_layer IF NOT EXISTS FOR (e:CodeEntity) ON (e.semantic_layer)",
     "CREATE FULLTEXT INDEX entity_search IF NOT EXISTS FOR (e:CodeEntity) ON EACH [e.simple_name, e.qualified_name, e.docstring]",
+    "CREATE INDEX brd_repo IF NOT EXISTS FOR (b:BRD) ON (b.repo_id)",
+    "CREATE INDEX brd_version IF NOT EXISTS FOR (b:BRD) ON (b.version)",
 ]
 
 CLEAR_GRAPH = "MATCH (n) DETACH DELETE n"
@@ -22,10 +26,15 @@ SET e += $props,
     e:%(label)s
 """
 
-MERGE_FILE = """
-MERGE (f:File {path: $path})
-SET f.line_count = $line_count
+LINK_FILES_FOR_REPO = """
+MATCH (m:CodeEntity {repo: $slug})
+WHERE m.kind = 'Module' AND m.file_path IS NOT NULL
+MERGE (f:File {repo: $slug, path: m.file_path})
+MERGE (m)-[:DEFINED_IN]->(f)
+RETURN count(DISTINCT f) AS file_count
 """
+
+DELETE_FILES_FOR_REPO = "MATCH (f:File {repo: $slug}) DETACH DELETE f"
 
 MERGE_RELATIONSHIP = """
 MATCH (src:CodeEntity {qualified_name: $source_qname})
