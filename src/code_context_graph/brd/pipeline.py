@@ -7,10 +7,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from code_context_graph.agent.brd_judge import ajudge as _ajudge_t
-    from code_context_graph.agent.brd_orchestrator import agenerate_brd_draft as _adraft_t
     from code_context_graph.agent.deps import GraphDeps
-    from code_context_graph.agent.harness import AgentRunner, SdkAgentRunner
+    from code_context_graph.agent.harness import AgentRunner
 
 from code_context_graph.brd.renderer import render_html
 from code_context_graph.brd.storage import BRDStorage

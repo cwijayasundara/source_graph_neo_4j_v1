@@ -170,7 +170,6 @@ def start_brd(
     repo_id: str,
     background: BackgroundTasks,
     max_retries: int | None = Query(None),
-    force_map_reduce: bool = Query(False),
 ) -> dict:
     existing = _brd_jobs.get(repo_id)
     if existing and existing.get("status") == "running":

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
 
 from code_context_graph.agent import graph_ops as ops
 from code_context_graph.agent.brd_schema import BRDDraft, brd_draft_schema
@@ -59,6 +58,30 @@ def _stub_draft(name: str, exc: Exception) -> BRDDraft:
     )
 
 
+def _merge_drafts_fallback(drafts: list[BRDDraft]) -> BRDDraft:
+    """Deterministic reduce used when the LLM reduce step fails: concatenate
+    same-titled sections and union every evidence_map (drop nothing)."""
+    from collections import OrderedDict
+    by_title: "OrderedDict[str, BRDSection]" = OrderedDict()
+    evidence: dict[str, list[str]] = {}
+    for d in drafts:
+        for s in d.sections:
+            if s.title in by_title:
+                cur = by_title[s.title]
+                cur.body_markdown = (cur.body_markdown + "\n\n" + s.body_markdown).strip()
+                cur.requirements.extend(s.requirements)
+            else:
+                by_title[s.title] = BRDSection(title=s.title,
+                                               body_markdown=s.body_markdown,
+                                               requirements=list(s.requirements))
+        for k, refs in d.evidence_map.items():
+            bucket = evidence.setdefault(k, [])
+            for ref in refs:
+                if ref not in bucket:
+                    bucket.append(ref)
+    return BRDDraft(sections=list(by_title.values()), evidence_map=evidence)
+
+
 async def _map_one(deps, runner, server, model, max_turns, sub) -> BRDDraft:
     try:
         raw = await runner.run_structured(
@@ -86,9 +109,12 @@ async def agenerate_brd_draft(deps: GraphDeps, *, runner: AgentRunner, model: st
     if len(drafts) == 1:
         return drafts[0], Strategy.single_shot
 
-    merged = await runner.run_structured(
-        system=REDUCE_SYSTEM, prompt=_reduce_prompt(list(drafts)),
-        server=server, allowed_tools=GRAPH_TOOL_NAMES, model=model,
-        max_turns=max_turns, schema=brd_draft_schema(),
-    )
-    return BRDDraft.model_validate(merged), Strategy.map_reduce
+    try:
+        merged = await runner.run_structured(
+            system=REDUCE_SYSTEM, prompt=_reduce_prompt(list(drafts)),
+            server=server, allowed_tools=GRAPH_TOOL_NAMES, model=model,
+            max_turns=max_turns, schema=brd_draft_schema(),
+        )
+        return BRDDraft.model_validate(merged), Strategy.map_reduce
+    except Exception:
+        return _merge_drafts_fallback(list(drafts)), Strategy.map_reduce

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Protocol, runtime_checkable
+
+logger = logging.getLogger(__name__)
 
 
 @runtime_checkable
@@ -55,5 +58,5 @@ class SdkAgentRunner:
                     self.token_usage["output"] += usage.get("output_tokens", 0) or 0
             return structured
         except Exception:
-            # Never raise on usage/parse failures — return empty dict
+            logger.exception("SdkAgentRunner.run_structured failed; returning empty result")
             return {}

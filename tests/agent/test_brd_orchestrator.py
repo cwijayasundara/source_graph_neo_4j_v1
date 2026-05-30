@@ -51,6 +51,29 @@ async def test_multi_subsystem_maps_then_reduces(seeded, tmp_path, fake_runner):
 
 
 @pytest.mark.asyncio
+async def test_reduce_failure_degrades_to_deterministic_merge(seeded, tmp_path, fake_runner):
+    seeded.when(lambda q, p: "RETURN e.qualified_name AS qn" in q,
+                [{"qn": "a"}, {"qn": "b"}])
+    seeded.when(lambda q, p: "RETURN a.qualified_name AS src" in q, [])  # disconnected -> 2 subsystems
+    deps = GraphDeps(client=seeded, repo_id="r", repo_path=tmp_path)
+    fake_runner.script(
+        {"sections": [{"title": "Functional Requirements", "body_markdown": "a",
+                       "requirements": [{"id": "FR-1", "text": "a"}]}],
+         "evidence_map": {"FR-1": ["a"]}},
+        {"sections": [{"title": "Functional Requirements", "body_markdown": "b",
+                       "requirements": [{"id": "FR-2", "text": "b"}]}],
+         "evidence_map": {"FR-2": ["b"]}},
+        # No reduce output scripted -> fake_runner returns {} -> model_validate fails -> fallback
+    )
+    draft, strategy = await agenerate_brd_draft(
+        deps, runner=fake_runner, model="m", max_turns=5, max_subsystems=12,
+    )
+    assert strategy == Strategy.map_reduce
+    assert draft.evidence_map == {"FR-1": ["a"], "FR-2": ["b"]}   # unioned, nothing dropped
+    assert draft.sections                                          # merged, not empty
+
+
+@pytest.mark.asyncio
 async def test_failed_subsystem_degrades_to_stub(seeded, tmp_path, fake_runner):
     seeded.when(lambda q, p: "RETURN e.qualified_name AS qn" in q,
                 [{"qn": "a"}, {"qn": "b"}])
