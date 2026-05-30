@@ -65,6 +65,35 @@ def test_ask_codebase_generates_executes_and_summarizes() -> None:
     assert "backend.app.agent.handle_message" in llm.prompts[1]
 
 
+def test_ask_codebase_falls_back_to_graph_when_no_rows(tmp_path):
+    from code_context_graph.llm_query import ask_codebase
+
+    class EmptyGraphClient:
+        def __init__(self):
+            self.calls = []
+
+        def run(self, query, **params):
+            self.calls.append((query, params))
+            return []  # the generated Cypher matches nothing
+
+    class CypherOnlyLLM:
+        def generate_text(self, prompt):
+            return ('{"cypher":"MATCH (e:CodeEntity) WHERE e.repo = $repo '
+                    'RETURN e.qualified_name AS name","explanation":"x"}')
+
+    class FakeRunner:
+        async def run_structured(self, **kw):
+            return {"answer": "Found via graph navigation."}
+
+    result = ask_codebase(
+        client=EmptyGraphClient(), repo="r", question="q",
+        llm=CypherOnlyLLM(), runner=FakeRunner(), repo_path=str(tmp_path),
+    )
+    assert result.rows == []
+    assert result.answer == "Found via graph navigation."
+    assert "navigation" in result.explanation.lower()
+
+
 def test_anthropic_text_client_satisfies_protocol_and_resolves_model(monkeypatch):
     from code_context_graph.llm_query import AnthropicTextClient
 

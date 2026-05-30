@@ -78,6 +78,8 @@ def ask_codebase(
     repo: str,
     question: str,
     llm: LLMClient | None = None,
+    runner=None,
+    repo_path=None,
 ) -> AskCodebaseResult:
     if not question.strip():
         raise ValueError("Question is required")
@@ -88,19 +90,50 @@ def ask_codebase(
     )
     cypher = enforce_read_only_cypher(generation["cypher"])
     rows = client.run(cypher, repo=repo)
+    explanation = generation.get("explanation", "")
+
+    if not rows:
+        fallback = _graph_fallback(client, repo, question, runner=runner,
+                                   repo_path=repo_path)
+        if fallback:
+            return AskCodebaseResult(
+                answer=fallback, cypher=cypher, rows=rows,
+                explanation=(explanation + " (answered via graph navigation)").strip())
+
     answer = model.generate_text(
-        _build_summary_prompt(
-            question=question,
-            cypher=cypher,
-            rows=rows,
-        )
-    )
-    return AskCodebaseResult(
-        answer=answer,
-        cypher=cypher,
-        rows=rows,
-        explanation=generation.get("explanation", ""),
-    )
+        _build_summary_prompt(question=question, cypher=cypher, rows=rows))
+    return AskCodebaseResult(answer=answer, cypher=cypher, rows=rows,
+                             explanation=explanation)
+
+
+def _graph_fallback(client, repo, question, *, runner=None, repo_path=None):
+    """Answer via graph navigation when a single Cypher query returned no rows.
+    Best-effort: returns None (so the caller summarizes the empty result) if the repo
+    has no local path or the agent produced nothing."""
+    import asyncio
+    from pathlib import Path
+
+    if repo_path is None:
+        from code_context_graph.repo_manager import RepoManager
+        meta = RepoManager(client).get(repo)
+        if not meta or not meta.get("local_path"):
+            return None
+        repo_path = meta["local_path"]
+
+    from code_context_graph.agent.deps import GraphDeps
+    from code_context_graph.agent.ask_agent import agentic_answer
+    from code_context_graph.agent.models import resolve_model
+
+    if runner is None:
+        from code_context_graph.agent.harness import SdkAgentRunner
+        runner = SdkAgentRunner()
+    deps = GraphDeps(client=client, repo_id=repo, repo_path=Path(repo_path))
+    try:
+        return asyncio.run(agentic_answer(
+            deps, runner=runner, question=question,
+            model=resolve_model("ask"), max_turns=4))
+    except Exception:
+        return None
 
 
 def _parse_generation_response(text: str) -> dict[str, str]:
