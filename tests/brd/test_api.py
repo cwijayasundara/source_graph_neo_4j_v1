@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 def test_post_brd_starts_background_task():
     from code_context_graph.api import app
 
-    with patch("code_context_graph.api.generate_brd") as gen_mock:
+    with patch("code_context_graph.api.generate_brd_graph_sync") as gen_mock:
         gen_mock.return_value = MagicMock(
             brd_id="abc", rating=MagicMock(value="high"), attempts=1,
             weighted_score=4.5, version=1, html_path="/tmp/x.html",

@@ -187,25 +187,22 @@ def complex(
 def brd(
     repo: str = typer.Argument(..., help="Repo slug (or local path) to generate a BRD for."),
     max_retries: int = typer.Option(None, "--max-retries", help="Override BRD_MAX_RETRIES."),
-    force_map_reduce: bool = typer.Option(False, "--force-map-reduce",
-                                          help="Use map-reduce even if repo fits in context."),
     output_dir: str = typer.Option(None, "--output-dir", help="Override BRD_OUTPUT_DIR."),
     open_browser: bool = typer.Option(False, "--open", help="Open the BRD in the default browser."),
 ) -> None:
     """Generate a Business Requirements Document for an ingested repo."""
     import os
     import webbrowser
-    from code_context_graph.brd import generate_brd
+    from code_context_graph.brd import generate_brd_graph_sync
     from code_context_graph.brd.schema import Rating
 
     if output_dir:
         os.environ["BRD_OUTPUT_DIR"] = output_dir
 
     console.print(f"[cyan]Generating BRD for {repo}...[/cyan]")
-    result = generate_brd(
-        repo_id=repo,
+    result = generate_brd_graph_sync(
+        repo,
         max_retries=max_retries,
-        force_map_reduce=force_map_reduce,
     )
     badge = {"high": "green", "medium": "yellow", "low": "red"}[result.rating.value]
     console.print(

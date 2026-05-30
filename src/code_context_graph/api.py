@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-from code_context_graph.brd import generate_brd
+from code_context_graph.brd import generate_brd_graph_sync
 from code_context_graph.brd.storage import BRDStorage
 from code_context_graph.github_client import (
     clone_repo,
@@ -147,13 +147,12 @@ def list_repos() -> list[dict]:
 # take precedence over the catch-all repo slug routes.
 
 
-def _run_brd_job(repo_id: str, max_retries: int | None, force_map_reduce: bool) -> None:
+def _run_brd_job(repo_id: str, max_retries: int | None) -> None:
     try:
-        result = generate_brd(
-            repo_id=repo_id,
-            max_retries=max_retries,
-            force_map_reduce=force_map_reduce,
+        result = generate_brd_graph_sync(
+            repo_id,
             client=get_client(),
+            max_retries=max_retries,
         )
         _brd_jobs[repo_id] = {
             "status": "done", "brd_id": result.brd_id, "rating": result.rating.value,
@@ -177,7 +176,7 @@ def start_brd(
     if existing and existing.get("status") == "running":
         raise HTTPException(409, f"BRD generation already in progress for {repo_id}")
     _brd_jobs[repo_id] = {"status": "running"}
-    background.add_task(_run_brd_job, repo_id, max_retries, force_map_reduce)
+    background.add_task(_run_brd_job, repo_id, max_retries)
     return {"status": "running", "repo_id": repo_id}
 
 
