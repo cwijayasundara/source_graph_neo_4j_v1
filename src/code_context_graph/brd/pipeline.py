@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from code_context_graph.agent.deps import GraphDeps
     from code_context_graph.agent.harness import AgentRunner
 
+from code_context_graph.agent.models import resolve_model
 from code_context_graph.brd.renderer import render_html
 from code_context_graph.brd.storage import BRDStorage
 from code_context_graph.brd.schema import (
@@ -83,7 +84,7 @@ def generate_brd_graph_sync(repo_id: str, *, client=None, repo_path=None,
         if repo is None or not repo.get("local_path"):
             raise ValueError(f"Repo {repo_id} not registered or missing local_path")
         repo_path = repo["local_path"]
-    model = model or os.getenv("BRD_AGENT_MODEL", "claude-sonnet-4-6")
+    model = model or resolve_model("brd")
     max_retries = int(os.getenv("BRD_MAX_RETRIES", "1")) if max_retries is None else max_retries
     max_turns = int(os.getenv("BRD_AGENT_MAX_TURNS", "15")) if max_turns is None else max_turns
     max_subsystems = int(os.getenv("BRD_MAX_SUBSYSTEMS", "12")) if max_subsystems is None else max_subsystems
