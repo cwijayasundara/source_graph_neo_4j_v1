@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from dataclasses import dataclass
 from typing import Protocol
 
-import httpx
-from dotenv import load_dotenv
-
 from code_context_graph.neo4j_client import Neo4jClient
 
 
-DEFAULT_MODEL = "gemini-3.5-flash"
 DEFAULT_LIMIT = 50
 
 BLOCKED_CYPHER_RE = re.compile(
@@ -42,38 +37,25 @@ class AskCodebaseResult:
     explanation: str
 
 
-class GeminiClient:
-    def __init__(
-        self,
-        api_key: str | None = None,
-        model: str | None = None,
-        timeout: float = 30.0,
-    ) -> None:
-        load_dotenv()
-        self.api_key = api_key or os.getenv("GOOGLE_API_KEY", "")
-        self.model = model or os.getenv("CODE_GRAPH_LLM_MODEL", DEFAULT_MODEL)
-        self.timeout = timeout
-        if not self.api_key:
-            raise RuntimeError("GOOGLE_API_KEY is not set")
+class AnthropicTextClient:
+    """LLMClient backed by Claude (Anthropic Messages API), used for the two text
+    steps of ask_codebase: Cypher generation and answer summarization. Synchronous,
+    Haiku-tier by default via resolve_model('ask')."""
+
+    def __init__(self, model: str | None = None, max_tokens: int = 1024) -> None:
+        from code_context_graph.agent.models import resolve_model
+        self.model = model or resolve_model("ask")
+        self.max_tokens = max_tokens
 
     def generate_text(self, prompt: str) -> str:
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{self.model}:generateContent"
+        from anthropic import Anthropic
+        client = Anthropic()
+        resp = client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            messages=[{"role": "user", "content": prompt}],
         )
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.1},
-        }
-        with httpx.Client(timeout=self.timeout) as client:
-            response = client.post(url, params={"key": self.api_key}, json=payload)
-            response.raise_for_status()
-            data = response.json()
-        try:
-            parts = data["candidates"][0]["content"]["parts"]
-            return "".join(part.get("text", "") for part in parts).strip()
-        except (KeyError, IndexError, TypeError) as exc:
-            raise RuntimeError("Gemini returned an unexpected response shape") from exc
+        return "".join(getattr(b, "text", "") for b in resp.content)
 
 
 def enforce_read_only_cypher(cypher: str, limit: int = DEFAULT_LIMIT) -> str:
@@ -99,7 +81,7 @@ def ask_codebase(
 ) -> AskCodebaseResult:
     if not question.strip():
         raise ValueError("Question is required")
-    model = llm or GeminiClient()
+    model = llm or AnthropicTextClient()
 
     generation = _parse_generation_response(
         model.generate_text(_build_cypher_prompt(repo=repo, question=question))

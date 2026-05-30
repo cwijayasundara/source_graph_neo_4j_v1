@@ -63,3 +63,17 @@ def test_ask_codebase_generates_executes_and_summarizes() -> None:
     assert graph.calls == [(result.cypher, {"repo": "owner/repo"})]
     assert "owner/repo" in llm.prompts[0]
     assert "backend.app.agent.handle_message" in llm.prompts[1]
+
+
+def test_anthropic_text_client_satisfies_protocol_and_resolves_model(monkeypatch):
+    from code_context_graph.llm_query import AnthropicTextClient
+
+    for v in ["ASK_MODEL", "CODE_GRAPH_LLM_MODEL"]:
+        monkeypatch.delenv(v, raising=False)
+    c = AnthropicTextClient()
+    # duck-typed LLMClient conformance (LLMClient is a plain Protocol, not
+    # runtime_checkable, so isinstance() can't be used here)
+    assert callable(getattr(c, "generate_text", None))
+    assert c.model == "claude-haiku-4-5-20251001"   # resolve_model("ask") default
+    monkeypatch.setenv("ASK_MODEL", "claude-sonnet-4-6")
+    assert AnthropicTextClient().model == "claude-sonnet-4-6"
