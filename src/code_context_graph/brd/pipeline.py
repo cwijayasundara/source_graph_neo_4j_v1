@@ -104,6 +104,5 @@ def generate_brd_graph_sync(repo_id: str, *, client=None, repo_path=None,
         repo_id=repo_id, html=html, judge_report=result.report,
         attempt_history=result.attempt_history, model=model,
         strategy=result.strategy,
-        token_usage={"input": runner.token_usage["input"],
-                     "output": runner.token_usage["output"]},
+        token_usage=dict(runner.token_usage),
     )
