@@ -72,15 +72,20 @@ def serve(
 
 @app.command()
 def enrich(
-    limit: int = typer.Option(50, "--limit", help="Max entities to enrich per run."),
+    repo: str = typer.Argument(..., help="Repo slug to enrich (must be ingested)."),
+    batch_size: int = typer.Option(20, "--batch-size",
+                                    help="Entities fetched per round (highest centrality first)."),
+    max_concurrency: int = typer.Option(6, "--concurrency",
+                                        help="Max concurrent enrichment agents."),
 ) -> None:
-    """Run LLM semantic enrichment on un-tagged entities."""
-    from code_context_graph.enrichment import SemanticEnricher
+    """Tag a repo's entities with architectural roles using the graph-navigating agent."""
+    from code_context_graph.agent.enricher import enrich_repo_sync
     from code_context_graph.neo4j_client import Neo4jClient
 
     with Neo4jClient() as client:
-        enricher = SemanticEnricher(client)
-        count = enricher.enrich_all(limit=limit)
+        console.print(f"[cyan]Enriching {repo}...[/cyan]")
+        count = enrich_repo_sync(repo, client=client, batch_size=batch_size,
+                                 max_concurrency=max_concurrency)
         console.print(f"[green]Enriched {count} entities[/green]")
 
 
