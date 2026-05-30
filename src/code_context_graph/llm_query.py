@@ -144,10 +144,10 @@ def _parse_generation_response(text: str) -> dict[str, str]:
     try:
         payload = json.loads(cleaned)
     except json.JSONDecodeError as exc:
-        raise RuntimeError("Gemini did not return valid JSON for Cypher generation") from exc
+        raise RuntimeError("the model did not return valid JSON for Cypher generation") from exc
     cypher = payload.get("cypher")
     if not isinstance(cypher, str):
-        raise RuntimeError("Gemini response did not include a Cypher string")
+        raise RuntimeError("the model response did not include a Cypher string")
     explanation = payload.get("explanation", "")
     if not isinstance(explanation, str):
         explanation = ""

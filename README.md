@@ -37,9 +37,8 @@ NEO4J_PASSWORD=please-change-me
 LLM key (required for semantic enrichment, BRD generator/judge, and Ask the Codebase) also goes in `.env`:
 
 ```bash
-GOOGLE_API_KEY=your-google-api-key
-CODE_GRAPH_LLM_MODEL=gemini-3.5-flash
-BRD_MODEL=gemini-3.5-flash
+ANTHROPIC_API_KEY=sk-ant-...
+CODE_GRAPH_LLM_MODEL=claude-sonnet-4-6   # global default; leave blank to use Haiku for cheap paths
 ```
 
 For COBOL analysis (optional), also set these in `.env` (see the "COBOL support" section below for the one-time JAR build). With `JAVA_HOME` set, Java does not need to be on your `PATH`:
@@ -237,7 +236,7 @@ Supported query kinds include:
 
 ## Optional Semantic Enrichment
 
-With `GOOGLE_API_KEY` in `.env`, enrich graph entities with semantic tags via Gemini:
+With `ANTHROPIC_API_KEY` in `.env`, enrich graph entities with semantic tags via Claude:
 
 ```bash
 uv run ccg enrich --limit 50
@@ -250,8 +249,8 @@ The repo detail page includes an LLM-backed ad-hoc question panel. It generates 
 Set these values in `.env` before using it. They are picked up automatically by the backend:
 
 ```bash
-GOOGLE_API_KEY=your-google-api-key
-CODE_GRAPH_LLM_MODEL=gemini-3.5-flash
+ANTHROPIC_API_KEY=sk-ant-...
+ASK_MODEL=                    # optional: defaults to CODE_GRAPH_LLM_MODEL (Haiku tier)
 ```
 
 Then start the backend and frontend from the Quick Start steps.
