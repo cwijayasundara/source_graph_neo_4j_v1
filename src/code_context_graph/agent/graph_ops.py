@@ -112,3 +112,66 @@ def graph_summary(deps: GraphDeps) -> dict[str, Any]:
     )
     return {"entity_counts": counts,
             "relationship_counts": {r["rel_type"]: r["count"] for r in rels}}
+
+
+# Default integration markers. Language-neutral I/O surface names; override via config.
+DEFAULT_INTEGRATION_MARKERS = [
+    "db2", "ims", "mq", "vsam", "sql", "jdbc", "http", "rest", "grpc", "kafka",
+    "s3", "redis", "queue", "socket", "file", "exec", "cics",
+]
+
+
+def entry_points(deps: GraphDeps, *, limit: int = 50) -> dict[str, Any]:
+    """Heuristic, language-agnostic: callable entities with zero incoming CALLS."""
+    rows = deps.client.run(
+        """
+        MATCH (e:CodeEntity {repo: $repo})
+        WHERE e.kind IN ['Function', 'Method', 'Module']
+        OPTIONAL MATCH (e)<-[c:CALLS]-()
+        WITH e, count(c) AS callers
+        WHERE callers = 0
+        RETURN e.qualified_name AS qualified_name, e.kind AS kind,
+               e.file_path AS file_path
+        ORDER BY e.qualified_name
+        LIMIT $limit
+        """,
+        repo=deps.repo_id, limit=limit,
+    )
+    return {"entry_points": rows}
+
+
+def integration_points(deps: GraphDeps, *, markers: list[str] | None = None,
+                       limit: int = 50) -> dict[str, Any]:
+    markers = markers or DEFAULT_INTEGRATION_MARKERS
+    rows = deps.client.run(
+        """
+        MATCH (e:CodeEntity {repo: $repo})
+        WHERE e.is_external = true
+           OR any(m IN $markers WHERE toLower(e.qualified_name) CONTAINS toLower(m))
+        RETURN e.qualified_name AS qualified_name, e.kind AS kind,
+               e.file_path AS file_path
+        ORDER BY e.qualified_name
+        LIMIT $limit
+        """,
+        repo=deps.repo_id, markers=markers, limit=limit,
+    )
+    return {"integration_points": rows}
+
+
+def known_refs(deps: GraphDeps) -> set[str]:
+    """Every valid evidence reference for the repo: entity qualified_names + file
+    paths. Used by the judge to detect hallucinated references."""
+    rows = deps.client.run(
+        """
+        MATCH (e:CodeEntity {repo: $repo})
+        RETURN DISTINCT e.qualified_name AS qualified_name, e.file_path AS file_path
+        """,
+        repo=deps.repo_id,
+    )
+    refs: set[str] = set()
+    for r in rows:
+        if r.get("qualified_name"):
+            refs.add(r["qualified_name"])
+        if r.get("file_path"):
+            refs.add(r["file_path"])
+    return refs
