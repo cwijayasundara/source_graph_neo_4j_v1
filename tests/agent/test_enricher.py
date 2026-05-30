@@ -45,3 +45,22 @@ async def test_empty_model_result_is_a_failure_not_a_write(seeded, tmp_path, fak
                       batch_size=10, max_concurrency=4, max_turns=4)
     assert n == 0
     assert not any("SET e.semantic_layer" in q for q, _ in seeded.calls)
+
+
+@pytest.mark.asyncio
+async def test_fetch_excludes_already_seen_entities(seeded, tmp_path, fake_runner):
+    # Each fetch should pass the set of already-seen names so the query can skip them
+    # (prevents a window of permanently-failing top-centrality entities from starving
+    # the rest).
+    seeded.when(lambda q, p: "semantic_layer IS NULL" in q,
+                [{"qualified_name": "pkg.a", "kind": "Function",
+                  "signature": "", "file_path": "src/a.py"}])
+    deps = GraphDeps(client=seeded, repo_id="r", repo_path=tmp_path)
+    fake_runner.script({"patterns": [], "layer": "business_logic",
+                        "concepts": [], "summary": "x"})
+    await aenrich(deps, runner=fake_runner, model="m",
+                  batch_size=10, max_concurrency=4, max_turns=4)
+    fetch_calls = [(q, p) for q, p in seeded.calls if "semantic_layer IS NULL" in q]
+    # the query must reference a $seen parameter, and the 2nd fetch must include pkg.a
+    assert all("$seen" in q for q, _ in fetch_calls)
+    assert fetch_calls[1][1]["seen"] == ["pkg.a"]

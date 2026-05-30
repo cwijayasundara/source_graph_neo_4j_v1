@@ -23,6 +23,7 @@ _FETCH_UNTAGGED = """
 MATCH (e:CodeEntity {repo: $repo})
 WHERE e.kind IN ['Class', 'Function', 'Method', 'Module']
   AND e.semantic_layer IS NULL
+  AND NOT e.qualified_name IN $seen
 OPTIONAL MATCH (e)-[r]-()
 WITH e, count(r) AS degree
 RETURN e.qualified_name AS qualified_name, e.kind AS kind,
@@ -48,8 +49,9 @@ def _enrich_prompt(entity: dict) -> str:
             "Inspect it via the tools and emit its EnrichmentTags.")
 
 
-def _fetch_untagged(deps: GraphDeps, limit: int) -> list[dict]:
-    return deps.client.run(_FETCH_UNTAGGED, repo=deps.repo_id, limit=limit)
+def _fetch_untagged(deps: GraphDeps, limit: int, seen: set[str]) -> list[dict]:
+    return deps.client.run(_FETCH_UNTAGGED, repo=deps.repo_id, limit=limit,
+                           seen=list(seen))
 
 
 async def _enrich_one(deps, runner, server, model, max_turns, entity, sem) -> bool:
@@ -85,7 +87,7 @@ async def aenrich(deps: GraphDeps, *, runner: AgentRunner, model: str,
     seen: set[str] = set()
     total = 0
     while True:
-        batch = _fetch_untagged(deps, batch_size)
+        batch = _fetch_untagged(deps, batch_size, seen)
         fresh = [e for e in batch if e.get("qualified_name")
                  and e["qualified_name"] not in seen]
         if not fresh:
